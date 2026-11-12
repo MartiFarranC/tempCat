@@ -116,7 +116,7 @@ header { display: grid; gap: 14px; }
 <body>
 <div class="wrap">
   <header>
-    <nav class="nav"><a href="./">← Comparador de pluja</a></nav>
+    <nav class="nav"><a href="./">← Inici</a><a href="comparador.html">Comparador de models</a></nav>
     <div>
       <h1>Ruta amb el temps</h1>
       <p class="sub">Tria d'on surts i on vas. Et dibuixo la ruta més ràpida en cotxe i el temps que fa <b>ara mateix</b> a cada municipi que travesses.</p>
@@ -547,6 +547,7 @@ header { display: grid; gap: 14px; }
 
   initMap();
   syncInputs();
+  if (location.hash === "#desti") { history.replaceState(null, "", location.pathname); if (!B) $("qb").focus(); }
   if (A && B) run();
 })();
 </script>

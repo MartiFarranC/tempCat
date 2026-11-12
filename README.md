@@ -2,7 +2,17 @@
 
 Comparador de previsions de pluja per a Catalunya: tots els models gratuïts d'Open-Meteo (AROME, HARMONIE, ICON, ECMWF, GFS…), probabilitats d'ensemble i radar, hora a hora.
 
-Pàgina estàtica (`index.html`), sense claus d'API. Publica-la amb GitHub Pages des de la branca `main`, carpeta arrel.
+## Inici (`index.html`)
+
+Pensada per al mòbil: només obrir-la, et localitza i mostra el municipi on ets, la temperatura d'ara, l'avís de pluja de les pròximes 12 hores, les pròximes hores i els 7 dies, i un botó gran cap a la ruta amb el temps.
+
+- Temperatura i humitat d'ara: **mesures reals** de l'estació XEMA del Meteocat més representativa (a menys de 15 km i amb altitud semblant), via les dades obertes de la Generalitat (`analisi.transparenciacatalunya.cat`, datasets `yqwd-vj5e` i `nzvn-apee`). Si no n'hi ha cap de recent, el valor del model.
+- Estat del cel i previsió: Open-Meteo (`best_match`).
+- Municipi: `data/municipis.topo.json`; fora de Catalunya, Nominatim.
+
+## Comparador de models (`comparador.html`)
+
+Pàgina estàtica, sense claus d'API. Publica-la amb GitHub Pages des de la branca `main`, carpeta arrel.
 
 ## Ruta amb el temps (`ruta.html`)
 

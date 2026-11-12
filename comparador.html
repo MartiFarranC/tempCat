@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Comparador de pluja</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+/* Layout: capçalera amb cercador, resum per finestres de temps, graella hora × model (heatmap), radar i enllaços. */
+:root {
+  --bg: #f3f6f8;
+  --surface: #ffffff;
+  --fg: #16232d;
+  --muted: #5b6b77;
+  --line: #d6dee4;
+  --accent: #1f6fa8;
+  --rain-rgb: 31, 111, 168;
+  --prob-rgb: 120, 72, 170;
+  --dry: #eef2f4;
+  --warn: #b5541c;
+  --ok: #2d7a4b;
+  --f-display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f171d; --surface: #16212a; --fg: #e3ebf0; --muted: #91a2ae; --line: #2a3943;
+    --accent: #6bb3e6; --rain-rgb: 96, 170, 230; --prob-rgb: 180, 140, 235; --dry: #1b2832;
+    --warn: #e8935f; --ok: #6cc28f; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f171d; --surface: #16212a; --fg: #e3ebf0; --muted: #91a2ae; --line: #2a3943;
+  --accent: #6bb3e6; --rain-rgb: 96, 170, 230; --prob-rgb: 180, 140, 235; --dry: #1b2832;
+  --warn: #e8935f; --ok: #6cc28f; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body {
+  margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+}
+.wrap { max-width: 1280px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; }
+.wrap > * { min-width: 0; }
+h1, h2 { font-family: var(--f-display); text-wrap: balance; margin: 0; letter-spacing: .01em; }
+h1 { font-size: 1.9rem; line-height: 1.1; }
+h2 { font-size: 1.25rem; }
+.sub { color: var(--muted); margin: 4px 0 0; max-width: 70ch; }
+.label { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+a { color: var(--accent); }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+header { display: grid; gap: 14px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.search { position: relative; flex: 1 1 260px; min-width: 0; max-width: 420px; }
+.search input { width: 100%; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.results { position: absolute; z-index: 1000; top: calc(100% + 4px); left: 0; right: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,.15); }
+.results button { display: block; width: 100%; text-align: left; padding: 8px 12px; border: 0; background: none; cursor: pointer; }
+.results button:hover, .results button:focus-visible { background: var(--dry); }
+.btn { padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); cursor: pointer; white-space: nowrap; }
+.btn:hover { border-color: var(--accent); }
+.btn[aria-pressed="true"] { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: transparent; cursor: pointer; font-size: .85rem; }
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+.place { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.place strong { font-family: var(--f-display); font-size: 1.4rem; }
+.place span { color: var(--muted); font-family: var(--f-mono); font-size: .8rem; }
+.status { font-size: .85rem; color: var(--muted); }
+.status.err { color: var(--warn); }
+
+.summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; }
+.verdict { font-family: var(--f-display); font-size: 1.35rem; line-height: 1.15; }
+.verdict.wet { color: var(--accent); }
+.verdict.maybe { color: var(--warn); }
+.verdict.dry { color: var(--ok); }
+.facts { font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.facts b { color: var(--fg); font-weight: 600; }
+
+.gridwrap { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; }
+table.g { border-collapse: separate; border-spacing: 0; font-family: var(--f-mono); font-size: .72rem; font-variant-numeric: tabular-nums; }
+.g th, .g td { padding: 0; text-align: center; }
+.g thead th { position: sticky; top: 0; background: var(--surface); color: var(--muted); font-weight: 400; height: 22px; min-width: 34px; }
+.g thead tr.days th { font-family: var(--f-body); font-weight: 600; color: var(--fg); text-align: left; padding-left: 6px; border-left: 2px solid var(--line); font-size: .78rem; }
+.g thead tr.hours th.d0 { border-left: 2px solid var(--line); }
+.g th.rowh { position: sticky; left: 0; z-index: 2; background: var(--surface); text-align: left; padding: 0 10px; min-width: 170px; max-width: 200px; font-family: var(--f-body); font-size: .8rem; font-weight: 500; color: var(--fg); border-right: 1px solid var(--line); white-space: nowrap; }
+.g th.rowh small { display: block; color: var(--muted); font-weight: 400; font-size: .68rem; line-height: 1.2; }
+.g tbody td { height: 32px; min-width: 34px; border-bottom: 1px solid var(--surface); border-right: 1px solid var(--surface); color: var(--fg); }
+.g tbody td.d0 { border-left: 2px solid var(--line); }
+.g tbody td.na { background: repeating-linear-gradient(45deg, transparent 0 4px, var(--dry) 4px 6px); }
+.g tbody td.dry { background: var(--dry); color: transparent; }
+.g tr.sep th, .g tr.sep td { border-top: 2px solid var(--line); }
+.g tbody tr.group th { text-align: left; padding: 10px 10px 4px; font-family: var(--f-body); font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); background: var(--surface); position: sticky; left: 0; }
+.g tbody tr.group td { background: var(--surface); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; font-size: .8rem; color: var(--muted); padding: 10px 12px; }
+.sw { display: inline-flex; align-items: center; gap: 4px; }
+.sw i { width: 18px; height: 12px; border-radius: 2px; display: inline-block; border: 1px solid var(--line); }
+
+.verif { display: grid; gap: 12px; }
+.vhead { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: end; }
+.vhead > div:first-child { min-width: 0; flex: 1 1 420px; }
+.g td.obs { cursor: pointer; background: var(--bg); color: var(--muted); font-size: .9rem; }
+.g td.obs:hover { outline: 2px solid var(--accent); outline-offset: -2px; }
+.g td.obs.wet { background: rgba(var(--rain-rgb), .9); color: var(--surface); }
+.g td.obs.dry0 { background: var(--dry); color: var(--fg); }
+.g td.hit { box-shadow: inset 0 -3px 0 var(--ok); }
+.g td.miss { box-shadow: inset 0 0 0 2px var(--warn); }
+.g td.fa { box-shadow: inset 0 -3px 0 var(--warn); }
+table.score { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: .85rem; }
+.score th, .score td { padding: 7px 12px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.score th:first-child, .score td:first-child { text-align: left; }
+.score thead th { color: var(--muted); font-weight: 600; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }
+.score .bar { display: inline-block; height: 8px; border-radius: 4px; background: var(--ok); vertical-align: middle; margin-left: 8px; }
+.score .empty { color: var(--muted); text-align: left; white-space: normal; }
+.two { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; }
+@media (max-width: 860px) { .two { grid-template-columns: minmax(0, 1fr); } }
+#map { height: 380px; border-radius: 10px; border: 1px solid var(--line); background: var(--dry); }
+.radarbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: .85rem; }
+.radarbar input[type=range] { flex: 1 1 160px; min-width: 0; }
+.links { display: grid; gap: 8px; }
+.links a { display: flex; justify-content: space-between; gap: 10px; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; text-decoration: none; color: var(--fg); }
+.links a:hover { border-color: var(--accent); }
+.links a span { color: var(--muted); font-size: .8rem; text-align: right; }
+.notes { color: var(--muted); font-size: .85rem; max-width: 80ch; }
+.notes li { margin-bottom: 4px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Comparador de pluja</h1>
+      <p class="sub">Tots els models gratuïts, hora a hora, per al mateix punt. Si els models no es posen d'acord, no et fiïs de cap previsió concreta: mira el radar i porta paraigua.</p>
+      <p class="sub" style="margin-top:8px"><a href="./">← Inici</a> · <a href="ruta.html"><b>🗺️ Ruta amb el temps</b></a></p>
+    </div>
+    <div class="controls">
+      <div class="search">
+        <input id="q" type="search" placeholder="Busca un municipi (p. ex. Vic, Olot, Reus…)" autocomplete="off" aria-label="Busca un municipi">
+        <div class="results" id="results" hidden></div>
+      </div>
+      <button class="btn" id="geo" type="button">📍 La meva ubicació</button>
+      <button class="btn" id="reload" type="button">Actualitza</button>
+      <select class="btn" id="span" aria-label="Horitzó">
+        <option value="24">24 h</option>
+        <option value="48" selected>48 h</option>
+        <option value="72">72 h</option>
+        <option value="120">5 dies</option>
+      </select>
+    </div>
+    <div class="chips" id="presets"></div>
+    <div class="place"><strong id="pname">—</strong><span id="pcoord"></span><span class="status" id="status"></span></div>
+  </header>
+
+  <section class="summary" id="summary" aria-label="Resum"></section>
+
+  <section>
+    <div class="gridwrap" id="gridwrap"><table class="g" id="grid"></table></div>
+    <div class="legend">
+      <span class="sw"><i style="background:var(--dry)"></i>sec (&lt;0,1 mm)</span>
+      <span class="sw"><i style="background:rgba(var(--rain-rgb),.25)"></i>0,1–1 mm</span>
+      <span class="sw"><i style="background:rgba(var(--rain-rgb),.55)"></i>1–4 mm</span>
+      <span class="sw"><i style="background:rgba(var(--rain-rgb),.95)"></i>&gt;4 mm/h</span>
+      <span class="sw"><i style="background:rgba(var(--prob-rgb),.6)"></i>probabilitat (% de membres de l'ensemble amb pluja)</span>
+      <span class="sw"><i class="na" style="background:repeating-linear-gradient(45deg,transparent 0 4px,var(--line) 4px 6px)"></i>fora de l'abast del model</span>
+    </div>
+  </section>
+
+  <section class="verif" id="verif">
+    <div class="vhead">
+      <div>
+        <h2>Qui l'ha encertat?</h2>
+        <p class="sub">Què deia cada model per a les últimes 24 hores, comparat amb el que ha passat. Toca les caselles de la fila <b>Realitat</b> per marcar si ha plogut (💧) o no (–). Les marques es guarden en aquest navegador i el marcador s'acumula dia rere dia.</p>
+      </div>
+      <div class="controls">
+        <select class="btn" id="lead" aria-label="Antelació de la previsió">
+          <option value="0">Previsió més recent</option>
+          <option value="1" selected>Previsió feta 1 dia abans</option>
+          <option value="2">Previsió feta 2 dies abans</option>
+        </select>
+        <button class="btn" id="markdry" type="button">Marca la resta com a sec</button>
+      </div>
+    </div>
+    <div class="gridwrap"><table class="g" id="vgrid"></table></div>
+    <div class="legend"><span class="sw"><i style="box-shadow:inset 0 -3px 0 var(--ok)"></i>encert de pluja</span><span class="sw"><i style="box-shadow:inset 0 0 0 2px var(--warn)"></i>ha plogut i no ho preveia</span><span class="sw"><i style="box-shadow:inset 0 -3px 0 var(--warn)"></i>preveia pluja i no ha plogut</span></div>
+    <div class="gridwrap"><table class="score" id="score"></table></div>
+  </section>
+
+  <section class="two">
+    <div style="display:grid;gap:10px;min-width:0">
+      <h2>Radar (RainViewer)</h2>
+      <div id="map"></div>
+      <div class="radarbar">
+        <button class="btn" id="play" type="button">▶︎ Anima</button>
+        <input type="range" id="frame" min="0" max="0" value="0" aria-label="Fotograma del radar">
+        <span id="ftime" class="facts">—</span>
+      </div>
+    </div>
+    <div style="display:grid;gap:10px;align-content:start;min-width:0">
+      <h2>Fonts oficials i radars</h2>
+      <div class="links" id="links"></div>
+    </div>
+  </section>
+
+  <section class="notes">
+    <h2 style="margin-bottom:6px">Com llegir-ho</h2>
+    <ul>
+      <li>Cada fila és un model numèric diferent, servit gratis per <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a>. Cada casella és la pluja d'aquella hora (de l'hora indicada a la següent), en mm.</li>
+      <li>Els models d'alta resolució (AROME, HARMONIE) són els millors per a xàfecs i tempestes de les pròximes 24-48 h. Els globals (ECMWF, GFS…) veuen millor els fronts a 3-5 dies però «suavitzen» els xàfecs.</li>
+      <li>Les files de probabilitat surten dels ensembles: el mateix model executat 30-50 vegades amb petites variacions. Un 40% vol dir que 4 de cada 10 execucions donen pluja en aquell punt i hora.</li>
+      <li>Meteocat (WRF) i AEMET (HARMONIE-AROME) no ofereixen les dades per model sense clau d'API, per això surten com a enllaç. La previsió de Meteocat és una interpretació humana i sovint és per comarca, no per al teu carrer.</li>
+    </ul>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(() => {
+  const TZ = "Europe/Madrid";
+  const PRESETS = [
+    ["Barcelona", 41.3874, 2.1686], ["Girona", 41.9794, 2.8214], ["Lleida", 41.6176, 0.6200],
+    ["Tarragona", 41.1189, 1.2445], ["Manresa", 41.7286, 1.8268], ["Vic", 41.9302, 2.2546],
+    ["Sabadell", 41.5463, 2.1086], ["Figueres", 42.2665, 2.9615], ["Tortosa", 40.8125, 0.5216],
+    ["Olot", 42.1822, 2.4890], ["Puigcerdà", 42.4317, 1.9280], ["Vielha", 42.7020, 0.7958],
+  ];
+  // Models deterministes (Open-Meteo forecast API). Un per petició, perquè si un falla no s'emporti els altres.
+  const MODELS = [
+    { group: "Alta resolució (millors per a xàfecs, 1-2 dies)" },
+    { id: "meteofrance_arome_france_hd", name: "AROME HD", info: "Météo-France · 1,5 km · 42 h" },
+    { id: "meteofrance_arome_france", name: "AROME", info: "Météo-France · 2,5 km · 42 h" },
+    { id: "knmi_harmonie_arome_europe", name: "HARMONIE Europa", info: "KNMI · 5,5 km · 60 h" },
+    { id: "icon_eu", name: "ICON-EU", info: "DWD · 7 km · 5 dies" },
+    { group: "Globals (millors per a fronts, 2-7 dies)" },
+    { id: "ecmwf_ifs", alt: "ecmwf_ifs025", name: "ECMWF IFS", info: "Europeu · 9 km · 10 dies" },
+    { id: "ecmwf_aifs025_single", name: "ECMWF AIFS (IA)", info: "Europeu · 25 km · 10 dies" },
+    { id: "meteofrance_arpege_europe", name: "ARPEGE", info: "Météo-France · 11 km · 4 dies" },
+    { id: "ukmo_global_deterministic_10km", name: "UK Met Office", info: "UKMO · 10 km · 7 dies" },
+    { id: "gfs_global", alt: "gfs_seamless", name: "GFS", info: "NOAA (EUA) · 13 km · 16 dies" },
+    { id: "gem_global", name: "GEM", info: "Canadà · 15 km · 10 dies" },
+    { id: "icon_global", name: "ICON global", info: "DWD · 13 km · 7 dies" },
+  ];
+  const ENSEMBLES = [
+    { id: "ecmwf_ifs025", name: "Prob. ECMWF ENS", info: "51 membres" },
+    { id: "icon_seamless", name: "Prob. ICON EPS", info: "DWD · 20-40 membres" },
+    { id: "gfs025", name: "Prob. GFS ENS", info: "31 membres" },
+  ];
+  const WET = 0.1;      // mm/h a partir del qual comptem "pluja"
+  const ENS_WET = 0.2;  // llindar per membre d'ensemble
+
+  const $ = (id) => document.getElementById(id);
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  };
+  let loc = store.get("bmc.loc") || { name: "Barcelona", lat: 41.3874, lon: 2.1686 };
+  let data = null;
+
+  // ---------- Temps ----------
+  const fmtKey = new Intl.DateTimeFormat("sv-SE", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hour12: false });
+  function keyOf(date) { // "YYYY-MM-DDTHH:00" en hora de Catalunya
+    const p = Object.fromEntries(fmtKey.formatToParts(date).map(x => [x.type, x.value]));
+    return `${p.year}-${p.month}-${p.day}T${p.hour === "24" ? "00" : p.hour}:00`;
+  }
+  function columns(hours) {
+    // Open-Meteo: el valor a les HH:00 és la pluja de l'hora anterior. Columna "10h" = 10:00–11:00 → clau 11:00.
+    const now = Date.now();
+    const cols = [];
+    for (let i = 0; i < hours; i++) {
+      const start = new Date(now + i * 3600e3);
+      const end = new Date(now + (i + 1) * 3600e3);
+      const sk = keyOf(start), ek = keyOf(end);
+      cols.push({ key: ek, day: sk.slice(0, 10), hour: +sk.slice(11, 13) });
+    }
+    return cols;
+  }
+  const dayName = (d) => new Date(d + "T12:00:00Z").toLocaleDateString("ca-ES", { weekday: "long", day: "numeric", month: "short", timeZone: "UTC" });
+
+  // ---------- Dades ----------
+  async function getJSON(url) {
+    const r = await fetch(url);
+    if (!r.ok) { let m = r.status; try { m = (await r.json()).reason || m; } catch {} throw new Error(m); }
+    return r.json();
+  }
+  function toMap(times, vals) {
+    const m = new Map();
+    times.forEach((t, i) => m.set(t, vals[i]));
+    return m;
+  }
+  async function fetchModel(m, lat, lon) {
+    const base = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=precipitation&timezone=${encodeURIComponent(TZ)}&past_hours=2&forecast_days=7`;
+    let j;
+    try { j = await getJSON(base + "&models=" + m.id); }
+    catch (e) { if (!m.alt) throw e; j = await getJSON(base + "&models=" + m.alt); }
+    const vals = j.hourly.precipitation;
+    if (!vals.some(v => v != null)) throw new Error("fora de domini");
+    return toMap(j.hourly.time, vals);
+  }
+  async function fetchBlendProb(lat, lon) {
+    const j = await getJSON(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=precipitation_probability,precipitation&timezone=${encodeURIComponent(TZ)}&past_hours=2&forecast_days=7`);
+    return { prob: toMap(j.hourly.time, j.hourly.precipitation_probability), mm: toMap(j.hourly.time, j.hourly.precipitation) };
+  }
+  async function fetchEnsemble(e, lat, lon) {
+    const j = await getJSON(`https://ensemble-api.open-meteo.com/v1/ensemble?latitude=${lat}&longitude=${lon}&hourly=precipitation&models=${e.id}&timezone=${encodeURIComponent(TZ)}&past_hours=2&forecast_days=7`);
+    const keys = Object.keys(j.hourly).filter(k => k.startsWith("precipitation"));
+    const m = new Map();
+    j.hourly.time.forEach((t, i) => {
+      let n = 0, wet = 0;
+      for (const k of keys) { const v = j.hourly[k][i]; if (v == null) continue; n++; if (v >= ENS_WET) wet++; }
+      m.set(t, n ? Math.round(100 * wet / n) : null);
+    });
+    if (![...m.values()].some(v => v != null)) throw new Error("sense dades");
+    return { map: m, members: keys.length };
+  }
+
+  async function load() {
+    const { lat, lon } = loc;
+    $("pname").textContent = loc.name;
+    $("pcoord").textContent = `${lat.toFixed(3)}, ${lon.toFixed(3)}`;
+    setStatus("Carregant models…");
+    renderLinks();
+    moveMap();
+    const det = MODELS.filter(m => m.id);
+    const [detRes, ensRes, blend] = await Promise.all([
+      Promise.allSettled(det.map(m => fetchModel(m, lat, lon))),
+      Promise.allSettled(ENSEMBLES.map(e => fetchEnsemble(e, lat, lon))),
+      fetchBlendProb(lat, lon).catch(() => null),
+    ]);
+    data = {
+      det: det.map((m, i) => ({ ...m, map: detRes[i].status === "fulfilled" ? detRes[i].value : null, err: detRes[i].reason?.message })),
+      ens: ENSEMBLES.map((e, i) => ({ ...e, map: ensRes[i].status === "fulfilled" ? ensRes[i].value.map : null, members: ensRes[i].value?.members, err: ensRes[i].reason?.message })),
+      blend, at: new Date(),
+    };
+    const ok = data.det.filter(d => d.map).length;
+    if (!ok && !blend) {
+      setStatus("No s'ha pogut connectar amb Open-Meteo. Comprova la connexió i torna-ho a provar.", true);
+    } else {
+      setStatus(`${ok} models + ${data.ens.filter(e => e.map).length} ensembles · actualitzat a les ${data.at.toLocaleTimeString("ca-ES", { hour: "2-digit", minute: "2-digit" })}`);
+    }
+    render();
+    loadVerif();
+  }
+  function setStatus(t, err) { const s = $("status"); s.textContent = t; s.classList.toggle("err", !!err); }
+
+  // ---------- Pintar ----------
+  const rainBg = (v) => {
+    if (v == null) return "";
+    if (v < WET) return "";
+    const a = v < 1 ? 0.18 + 0.12 * v : v < 4 ? 0.35 + 0.1 * (v - 1) : Math.min(1, 0.7 + 0.05 * (v - 4));
+    return `background:rgba(var(--rain-rgb),${a.toFixed(2)});${a > 0.6 ? "color:var(--surface);font-weight:600" : ""}`;
+  };
+  const probBg = (p) => p == null ? "" : p < 5 ? "" : `background:rgba(var(--prob-rgb),${(0.08 + 0.82 * p / 100).toFixed(2)});${p >= 60 ? "color:var(--surface);font-weight:600" : ""}`;
+  const fmtMm = (v) => v >= 10 ? Math.round(v) : v.toFixed(1).replace(".", ",");
+
+  function render() {
+    if (!data) return;
+    const hours = +$("span").value;
+    const cols = columns(hours);
+    renderSummary();
+    let h = "<thead><tr class=days><th class=rowh></th>";
+    let i = 0;
+    while (i < cols.length) {
+      let j = i; while (j < cols.length && cols[j].day === cols[i].day) j++;
+      h += `<th colspan=${j - i}>${(j - i) >= 3 ? dayName(cols[i].day) : ""}</th>`;
+      i = j;
+    }
+    h += "</tr><tr class=hours><th class=rowh><span class=label>hora</span></th>";
+    cols.forEach((c, k) => { h += `<th class="${k && c.hour === 0 ? "d0" : ""}">${String(c.hour).padStart(2, "0")}</th>`; });
+    h += "</tr></thead><tbody>";
+    const cellCls = (c, k, extra) => `${k && c.hour === 0 ? "d0 " : ""}${extra}`;
+    const rowDet = (d) => {
+      let r = `<tr><th class=rowh title="${d.err ? "Error: " + d.err : ""}">${d.name}<small>${d.info}</small></th>`;
+      cols.forEach((c, k) => {
+        const v = d.map ? d.map.get(c.key) : undefined;
+        const tip = `${dayName(c.day)} ${c.hour}:00–${(c.hour + 1) % 24}:00 · ${d.name}: ${v == null ? "sense dades" : fmtMm(v) + " mm"}`;
+        if (v == null) r += `<td class="${cellCls(c, k, "na")}" title="${tip}"></td>`;
+        else if (v < WET) r += `<td class="${cellCls(c, k, "dry")}" title="${tip}">0</td>`;
+        else r += `<td class="${cellCls(c, k, "")}" style="${rainBg(v)}" title="${tip}">${fmtMm(v)}</td>`;
+      });
+      return r + "</tr>";
+    };
+    const rowProb = (name, info, map) => {
+      let r = `<tr><th class=rowh>${name}<small>${info}</small></th>`;
+      cols.forEach((c, k) => {
+        const p = map ? map.get(c.key) : undefined;
+        const tip = `${dayName(c.day)} ${c.hour}:00 · ${name}: ${p == null ? "sense dades" : p + "%"}`;
+        if (p == null) r += `<td class="${cellCls(c, k, "na")}" title="${tip}"></td>`;
+        else r += `<td class="${cellCls(c, k, p < 5 ? "dry" : "")}" style="${probBg(p)}" title="${tip}">${p < 5 ? "" : p}</td>`;
+      });
+      return r + "</tr>";
+    };
+    const span = cols.length + 1;
+    // Consens: % de models deterministes amb pluja
+    const consensus = new Map(cols.map(c => {
+      const vals = data.det.map(d => d.map?.get(c.key)).filter(v => v != null);
+      return [c.key, vals.length ? Math.round(100 * vals.filter(v => v >= WET).length / vals.length) : null];
+    }));
+    h += `<tr class=group><th colspan=${span}>Acord entre models</th></tr>`;
+    h += rowProb("Models que donen pluja", "% dels models d'aquesta taula", consensus);
+    if (data.blend) h += rowProb("Probabilitat Open-Meteo", "barreja d'ensembles", data.blend.prob);
+    h += `<tr class=group><th colspan=${span}>Ensembles: probabilitat de pluja ≥ ${String(ENS_WET).replace(".", ",")} mm/h</th></tr>`;
+    data.ens.forEach(e => { h += rowProb(e.name, e.members ? `${e.members} membres` : e.info, e.map); });
+    MODELS.forEach(m => {
+      if (m.group) { h += `<tr class=group><th colspan=${span}>${m.group} · mm per hora</th></tr>`; return; }
+      h += rowDet(data.det.find(d => d.id === m.id));
+    });
+    h += "</tbody>";
+    $("grid").innerHTML = h;
+  }
+
+  function window_(from, n) {
+    const cols = columns(from + n).slice(from);
+    const per = data.det.filter(d => d.map).map(d => {
+      const vals = cols.map(c => d.map.get(c.key)).filter(v => v != null);
+      if (vals.length < cols.length * 0.6) return null;
+      const sum = vals.reduce((a, b) => a + b, 0);
+      return { name: d.name, sum, wet: vals.some(v => v >= WET) };
+    }).filter(Boolean);
+    const probs = data.ens.filter(e => e.map).flatMap(e => cols.map(c => e.map.get(c.key)).filter(v => v != null));
+    const maxProb = probs.length ? Math.max(...probs) : null;
+    return { per, maxProb };
+  }
+  function renderSummary() {
+    const wins = [["Pròximes 3 hores", 0, 3], ["Pròximes 12 hores", 0, 12], ["Pròximes 24 hores", 0, 24], ["Demà passat (24–48 h)", 24, 24]];
+    $("summary").innerHTML = wins.map(([title, from, n]) => {
+      const { per, maxProb } = window_(from, n);
+      if (!per.length) return `<div class=card><span class=label>${title}</span><div class=facts>Sense dades</div></div>`;
+      const wet = per.filter(p => p.wet);
+      const frac = wet.length / per.length;
+      const cls = frac >= 0.6 || (maxProb ?? 0) >= 60 ? "wet" : frac > 0.15 || (maxProb ?? 0) >= 25 ? "maybe" : "dry";
+      const verdict = cls === "wet" ? "Pluja probable" : cls === "maybe" ? "Pot ploure" : "Sec";
+      const sums = per.map(p => p.sum);
+      const mx = Math.max(...sums), mn = Math.min(...sums);
+      const wettest = per.reduce((a, b) => a.sum >= b.sum ? a : b);
+      return `<div class=card><span class=label>${title}</span><div class="verdict ${cls}">${verdict}</div>
+        <div class=facts><b>${wet.length} de ${per.length}</b> models donen pluja${maxProb != null ? ` · probabilitat màx. <b>${maxProb}%</b>` : ""}</div>
+        <div class=facts>Acumulat: <b>${fmtMm(mn)}–${fmtMm(mx)} mm</b>${mx >= WET ? ` (més plujós: ${wettest.name})` : ""}</div></div>`;
+    }).join("");
+  }
+
+  function renderLinks() {
+    const { lat, lon, name } = loc;
+    const L = [
+      ["Meteocat · radar", "https://www.meteo.cat/observacions/radar", "radar oficial de Catalunya"],
+      ["Meteocat · previsió municipal", "https://www.meteo.cat/prediccio/municipal", "busca " + name],
+      ["Meteocat · estacions (pluja real)", "https://www.meteo.cat/observacions/xema", "observacions XEMA"],
+      ["AEMET · radar", "https://www.aemet.es/ca/eltiempo/observacion/radar", "radar de Barcelona (Corbera)"],
+      ["AEMET · previsió per municipi", "https://www.aemet.es/ca/eltiempo/prediccion/municipios", "HARMONIE + predictor"],
+      ["Windy · pluja", `https://www.windy.com/?rain,${lat.toFixed(3)},${lon.toFixed(3)},9`, "compara models al mapa"],
+      ["Meteoblue · multimodel", `https://www.meteoblue.com/ca/temps/previsio/multimodel/${lat.toFixed(3)}N${lon.toFixed(3)}E`, "meteograma de molts models"],
+      ["Rainviewer", `https://www.rainviewer.com/map.html?loc=${lat.toFixed(3)},${lon.toFixed(3)},9`, "radar animat"],
+      ["Lightning maps · llamps", `https://www.lightningmaps.org/#m=oss;t=3;s=0;o=0;b=;ts=0;y=${lat.toFixed(2)};x=${lon.toFixed(2)};z=8;`, "tempestes en directe"],
+    ];
+    $("links").innerHTML = L.map(([t, u, s]) => `<a href="${u}" target="_blank" rel="noopener">${t}<span>${s}</span></a>`).join("");
+  }
+
+  // ---------- Radar ----------
+  let map, marker, layers = [], frames = [], cur = 0, timer = null;
+  function initMap() {
+    if (!window.L) { $("map").innerHTML = "<p class=status style='padding:16px'>No s'ha pogut carregar el mapa. Fes servir els enllaços de radar.</p>"; return; }
+    map = L.map("map", { zoomControl: true, attributionControl: true }).setView([loc.lat, loc.lon], 8);
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", { maxZoom: 12, attribution: "© OpenStreetMap, © CARTO, radar © RainViewer" }).addTo(map);
+    marker = L.circleMarker([loc.lat, loc.lon], { radius: 7, color: "#c0392b", weight: 2, fillOpacity: .3 }).addTo(map);
+    loadRadar();
+    setInterval(loadRadar, 10 * 60e3);
+  }
+  function moveMap() { if (map) { map.setView([loc.lat, loc.lon], map.getZoom()); marker.setLatLng([loc.lat, loc.lon]); } }
+  async function loadRadar() {
+    try {
+      const j = await getJSON("https://api.rainviewer.com/public/weather-maps.json");
+      layers.forEach(l => map.removeLayer(l));
+      frames = [...(j.radar?.past || []), ...(j.radar?.nowcast || [])];
+      layers = frames.map(f => L.tileLayer(`${j.host}${f.path}/256/{z}/{x}/{y}/2/1_1.png`, { opacity: 0, maxNativeZoom: 7, maxZoom: 12, zIndex: 5 }).addTo(map));
+      $("frame").max = Math.max(0, frames.length - 1);
+      show(frames.length - 1 - (j.radar?.nowcast?.length || 0));
+    } catch { $("ftime").textContent = "Radar no disponible"; }
+  }
+  function show(i) {
+    if (!frames.length) return;
+    cur = (i + frames.length) % frames.length;
+    layers.forEach((l, k) => l.setOpacity(k === cur ? 0.75 : 0));
+    $("frame").value = cur;
+    const t = new Date(frames[cur].time * 1000);
+    $("ftime").textContent = t.toLocaleTimeString("ca-ES", { hour: "2-digit", minute: "2-digit", timeZone: TZ }) + (frames[cur].time * 1000 > Date.now() ? " (previsió)" : "");
+  }
+  $("frame").addEventListener("input", e => show(+e.target.value));
+  $("play").addEventListener("click", () => {
+    if (timer) { clearInterval(timer); timer = null; $("play").textContent = "▶︎ Anima"; return; }
+    $("play").textContent = "❚❚ Atura";
+    timer = setInterval(() => show(cur + 1), 600);
+  });
+
+  // ---------- Ubicació ----------
+  function setLoc(l) { loc = l; store.set("bmc.loc", l); load(); }
+  $("presets").innerHTML = PRESETS.map(([n], i) => `<button class=chip type=button data-i=${i}>${n}</button>`).join("");
+  $("presets").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; const [name, lat, lon] = PRESETS[+b.dataset.i]; setLoc({ name, lat, lon }); });
+  let qt;
+  $("q").addEventListener("input", e => {
+    clearTimeout(qt);
+    const q = e.target.value.trim();
+    if (q.length < 2) { $("results").hidden = true; return; }
+    qt = setTimeout(async () => {
+      try {
+        const j = await getJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=8&language=ca&countryCode=ES`);
+        const res = (j.results || []).sort((a, b) => (b.admin1 === "Catalonia" || b.admin1 === "Catalunya") - (a.admin1 === "Catalonia" || a.admin1 === "Catalunya"));
+        $("results").innerHTML = res.length ? res.map((r, i) => `<button type=button data-i=${i}>${r.name} <span class=status>${[r.admin2, r.admin1].filter(Boolean).join(", ")}</span></button>`).join("") : "<div class=status style='padding:8px 12px'>Cap resultat</div>";
+        $("results").hidden = false;
+        $("results").onclick = (ev) => { const b = ev.target.closest("button"); if (!b) return; const r = res[+b.dataset.i]; $("results").hidden = true; $("q").value = ""; setLoc({ name: r.name, lat: r.latitude, lon: r.longitude }); };
+      } catch { $("results").innerHTML = "<div class=status style='padding:8px 12px'>Error al cercar</div>"; $("results").hidden = false; }
+    }, 300);
+  });
+  document.addEventListener("click", e => { if (!e.target.closest(".search")) $("results").hidden = true; });
+  $("geo").addEventListener("click", () => {
+    if (!navigator.geolocation) { setStatus("El navegador no permet la ubicació", true); return; }
+    setStatus("Buscant la teva ubicació…");
+    navigator.geolocation.getCurrentPosition(
+      p => setLoc({ name: "La meva ubicació", lat: p.coords.latitude, lon: p.coords.longitude }),
+      () => setStatus("No s'ha pogut obtenir la ubicació (el navegador ho pot bloquejar en fitxers locals). Busca el municipi.", true),
+      { timeout: 10000 });
+  });
+  $("reload").addEventListener("click", load);
+  $("span").addEventListener("change", () => { store.set("bmc.span", $("span").value); render(); });
+  const sp = store.get("bmc.span"); if (sp) $("span").value = sp;
+
+  // ---------- Verificació: previsió passada vs. realitat ----------
+  let verif = null;
+  const obsKey = () => `bmc.obs:${loc.lat.toFixed(2)},${loc.lon.toFixed(2)}`;
+  const getObs = () => store.get(obsKey()) || {};
+  const setObs = (o) => store.set(obsKey(), o);
+  function pastColumns(n) {
+    // n hores ja acabades, de la més antiga a la més recent. Clau = final de l'hora (convenció Open-Meteo).
+    const now = Date.now();
+    const cols = [];
+    for (let i = n; i >= 1; i--) {
+      const start = new Date(now - i * 3600e3);
+      const sk = keyOf(start), ek = keyOf(new Date(now - (i - 1) * 3600e3));
+      cols.push({ key: ek, day: sk.slice(0, 10), hour: +sk.slice(11, 13) });
+    }
+    return cols;
+  }
+  async function fetchPrevRun(m, lat, lon) {
+    const vars = "precipitation,precipitation_previous_day1,precipitation_previous_day2";
+    const base = `https://previous-runs-api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=${vars}&timezone=${encodeURIComponent(TZ)}&past_days=7&forecast_days=1`;
+    let j;
+    try { j = await getJSON(base + "&models=" + m.id); }
+    catch (e) { if (!m.alt) throw e; j = await getJSON(base + "&models=" + m.alt); }
+    const out = {};
+    [["precipitation", 0], ["precipitation_previous_day1", 1], ["precipitation_previous_day2", 2]].forEach(([k, lead]) => {
+      const v = j.hourly[k];
+      out[lead] = v && v.some(x => x != null) ? toMap(j.hourly.time, v) : null;
+    });
+    if (!out[0] && !out[1] && !out[2]) throw new Error("sense dades");
+    return out;
+  }
+  async function loadVerif() {
+    const { lat, lon } = loc;
+    const det = MODELS.filter(m => m.id);
+    const res = await Promise.allSettled(det.map(m => fetchPrevRun(m, lat, lon)));
+    verif = det.map((m, i) => ({ ...m, runs: res[i].status === "fulfilled" ? res[i].value : null }));
+    renderVerif();
+  }
+  function scoreModel(map, obs) {
+    let hit = 0, cn = 0, miss = 0, fa = 0;
+    for (const [k, o] of Object.entries(obs)) {
+      const v = map?.get(k);
+      if (v == null) continue;
+      const p = v >= WET;
+      if (o && p) hit++; else if (!o && !p) cn++; else if (o) miss++; else fa++;
+    }
+    const n = hit + cn + miss + fa;
+    return { hit, cn, miss, fa, n, acc: n ? (hit + cn) / n : null };
+  }
+  function renderVerif() {
+    if (!verif) return;
+    const lead = +$("lead").value;
+    const cols = pastColumns(24);
+    const obs = getObs();
+    let h = "<thead><tr class=hours><th class=rowh><span class=label>hora</span></th>";
+    cols.forEach((c, k) => { h += `<th class="${k && c.hour === 0 ? "d0" : ""}">${String(c.hour).padStart(2, "0")}</th>`; });
+    h += "</tr></thead><tbody><tr><th class=rowh>Realitat<small>toca per marcar</small></th>";
+    cols.forEach((c, k) => {
+      const o = obs[c.key];
+      const cls = o === 1 ? "wet" : o === 0 ? "dry0" : "";
+      h += `<td class="obs ${cls} ${k && c.hour === 0 ? "d0" : ""}" data-k="${c.key}" title="${c.hour}:00–${(c.hour + 1) % 24}:00 · toca per canviar">${o === 1 ? "💧" : o === 0 ? "–" : "?"}</td>`;
+    });
+    h += `</tr><tr class=group><th colspan=${cols.length + 1}>El que deia cada model · mm per hora</th></tr>`;
+    verif.forEach(m => {
+      const map = m.runs?.[lead];
+      h += `<tr><th class=rowh>${m.name}<small>${m.info}</small></th>`;
+      cols.forEach((c, k) => {
+        const v = map?.get(c.key);
+        const o = obs[c.key];
+        let mark = "";
+        if (v != null && o != null) {
+          const p = v >= WET;
+          mark = o && p ? "hit" : !o && !p ? "" : o ? "miss" : "fa";
+        }
+        const d0 = k && c.hour === 0 ? "d0 " : "";
+        if (v == null) h += `<td class="${d0}na"></td>`;
+        else if (v < WET) h += `<td class="${d0}dry ${mark}">0</td>`;
+        else h += `<td class="${d0}${mark}" style="${rainBg(v)}">${fmtMm(v)}</td>`;
+      });
+      h += "</tr>";
+    });
+    $("vgrid").innerHTML = h + "</tbody>";
+
+    // Marcador acumulat (totes les hores marcades dels últims 7 dies)
+    const rows = verif.map(m => ({ name: m.name, ...scoreModel(m.runs?.[lead], obs) })).filter(r => r.n);
+    const leadTxt = ["la previsió més recent", "la previsió feta 1 dia abans", "la previsió feta 2 dies abans"][lead];
+    if (!rows.length) {
+      $("score").innerHTML = `<tbody><tr><td class=empty>Marca algunes hores a la fila Realitat i aquí veuràs quin model encerta més, segons ${leadTxt}.</td></tr></tbody>`;
+      return;
+    }
+    rows.sort((a, b) => b.acc - a.acc || a.miss - b.miss);
+    $("score").innerHTML = `<thead><tr><th>Marcador · ${leadTxt}</th><th>Encerts</th><th>Pluja no prevista</th><th>Falses alarmes</th><th>Hores</th></tr></thead><tbody>` +
+      rows.map(r => `<tr><td>${r.name}</td><td>${Math.round(r.acc * 100)}%<span class=bar style="width:${Math.round(r.acc * 60)}px"></span></td><td>${r.miss}</td><td>${r.fa}</td><td>${r.n}</td></tr>`).join("") + "</tbody>";
+  }
+  $("vgrid").addEventListener("click", e => {
+    const td = e.target.closest("td.obs"); if (!td) return;
+    const o = getObs(); const k = td.dataset.k;
+    if (o[k] === undefined) o[k] = 1; else if (o[k] === 1) o[k] = 0; else delete o[k];
+    setObs(o); renderVerif();
+  });
+  $("markdry").addEventListener("click", () => {
+    const o = getObs();
+    pastColumns(24).forEach(c => { if (o[c.key] === undefined) o[c.key] = 0; });
+    setObs(o); renderVerif();
+  });
+  $("lead").addEventListener("change", renderVerif);
+
+  initMap();
+  load();
+  setInterval(load, 30 * 60e3);
+})();
+</script>
+</body>
+</html>
