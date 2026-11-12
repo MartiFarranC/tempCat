@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ruta amb el temps</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+/* Layout: capçalera amb origen/destinació, resum del trajecte, mapa amb la ruta i llista de municipis travessats amb el temps actual. */
+:root {
+  --bg: #f3f6f8; --surface: #ffffff; --fg: #16232d; --muted: #5b6b77; --line: #d6dee4;
+  --accent: #1f6fa8; --rain: #1f6fa8; --snow: #7a4fc0; --route: #2b3f4e; --dry: #eef2f4;
+  --warn: #b5541c; --ok: #2d7a4b;
+  --f-display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f171d; --surface: #16212a; --fg: #e3ebf0; --muted: #91a2ae; --line: #2a3943;
+    --accent: #6bb3e6; --rain: #4aa3ea; --snow: #b48cf0; --route: #cfdbe3; --dry: #1b2832;
+    --warn: #e8935f; --ok: #6cc28f; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f171d; --surface: #16212a; --fg: #e3ebf0; --muted: #91a2ae; --line: #2a3943;
+  --accent: #6bb3e6; --rain: #4aa3ea; --snow: #b48cf0; --route: #cfdbe3; --dry: #1b2832;
+  --warn: #e8935f; --ok: #6cc28f; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body {
+  margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+}
+.wrap { max-width: 1280px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+.wrap > * { min-width: 0; }
+h1, h2 { font-family: var(--f-display); text-wrap: balance; margin: 0; letter-spacing: .01em; }
+h1 { font-size: 1.9rem; line-height: 1.1; }
+h2 { font-size: 1.25rem; }
+.sub { color: var(--muted); margin: 4px 0 0; max-width: 70ch; }
+.label { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+a { color: var(--accent); }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.nav { display: flex; gap: 14px; font-size: .9rem; }
+
+header { display: grid; gap: 14px; }
+.points { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; max-width: 760px; align-items: center; }
+.pt { display: grid; grid-template-columns: 74px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.pt .label { margin: 0; }
+.search { position: relative; min-width: 0; }
+.search input { width: 100%; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.search input.set { border-color: var(--accent); }
+.results { position: absolute; z-index: 1000; top: calc(100% + 4px); left: 0; right: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,.15); }
+.results button { display: block; width: 100%; text-align: left; padding: 8px 12px; border: 0; background: none; cursor: pointer; }
+.results button:hover, .results button:focus-visible { background: var(--dry); }
+.results .status { padding: 8px 12px; display: block; }
+.btn { padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); cursor: pointer; white-space: nowrap; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); font-weight: 600; }
+.btn:disabled { opacity: .5; cursor: default; }
+.swap { grid-row: 1 / span 2; grid-column: 2; align-self: center; }
+.go { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.status { font-size: .85rem; color: var(--muted); }
+.status.err { color: var(--warn); }
+@media (max-width: 560px) {
+  .points { grid-template-columns: minmax(0, 1fr); }
+  .swap { grid-row: auto; grid-column: auto; justify-self: start; }
+  .pt { grid-template-columns: minmax(0, 1fr) auto; }
+  .pt .label { grid-column: 1 / -1; }
+}
+
+.summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.summary:empty { display: none; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; display: grid; gap: 4px; align-content: start; }
+.verdict { font-family: var(--f-display); font-size: 1.3rem; line-height: 1.15; }
+.verdict.wet { color: var(--rain); } .verdict.snow { color: var(--snow); } .verdict.warn { color: var(--warn); } .verdict.ok { color: var(--ok); }
+.facts { font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.facts b { color: var(--fg); font-weight: 600; }
+
+.main { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; align-items: start; }
+@media (max-width: 900px) { .main { grid-template-columns: minmax(0, 1fr); } }
+#map { height: min(70vh, 620px); min-height: 360px; border-radius: 10px; border: 1px solid var(--line); background: var(--dry); position: sticky; top: 12px; }
+@media (max-width: 900px) { #map { position: relative; top: 0; height: 420px; } }
+.wx-ico { background: none; border: 0; }
+.wx-pin { display: inline-flex; align-items: center; gap: 2px; padding: 1px 6px 1px 3px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 1px 4px rgba(0,0,0,.25); font: 600 12px/1.4 var(--f-body); color: var(--fg); white-space: nowrap; transform: translate(-50%, -50%); position: absolute; }
+.wx-pin.wet { border-color: var(--rain); } .wx-pin.snow { border-color: var(--snow); }
+.wx-pin .e { font-size: 15px; }
+.end-pin { width: 16px; height: 16px; border-radius: 50%; border: 3px solid var(--surface); box-shadow: 0 0 0 1px rgba(0,0,0,.4); transform: translate(-50%, -50%); position: absolute; }
+.leaflet-popup-content { font: 13px/1.45 var(--f-body); }
+.leaflet-popup-content .pbtns { display: flex; gap: 6px; margin-top: 6px; }
+
+.list { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.list:empty { display: none; }
+.com { padding: 10px 14px 4px; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; border-top: 1px solid var(--line); }
+.com:first-child { border-top: 0; }
+.row { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 2px 10px; padding: 8px 14px; cursor: pointer; align-items: center; border-left: 3px solid transparent; }
+.row:hover, .row:focus-visible { background: var(--dry); }
+.row.wet { border-left-color: var(--rain); } .row.snow { border-left-color: var(--snow); }
+.row .e { font-size: 1.5rem; line-height: 1; text-align: center; }
+.row .n { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .n small { font-weight: 400; color: var(--muted); font-family: var(--f-mono); font-size: .72rem; margin-left: 6px; }
+.row .t { font-family: var(--f-display); font-size: 1.25rem; font-variant-numeric: tabular-nums; text-align: right; }
+.row .d { grid-column: 2 / -1; font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.row .d b { color: var(--fg); font-weight: 500; }
+.row .d .r { color: var(--rain); font-weight: 600; } .row .d .s { color: var(--snow); font-weight: 600; } .row .d .w { color: var(--warn); font-weight: 600; }
+.notes { color: var(--muted); font-size: .85rem; max-width: 80ch; }
+.notes li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <nav class="nav"><a href="./">← Comparador de pluja</a></nav>
+    <div>
+      <h1>Ruta amb el temps</h1>
+      <p class="sub">Tria d'on surts i on vas. Et dibuixo la ruta més ràpida en cotxe i el temps que fa <b>ara mateix</b> a cada municipi que travesses.</p>
+    </div>
+    <div class="points">
+      <div class="pt">
+        <span class="label">Sortida</span>
+        <div class="search"><input id="qa" type="search" placeholder="Busca un lloc o fes servir la ubicació" autocomplete="off" aria-label="Lloc de sortida"><div class="results" id="ra" hidden></div></div>
+        <button class="btn" id="geo" type="button" title="Fes servir la meva ubicació actual">📍 Actual</button>
+      </div>
+      <div class="pt">
+        <span class="label">Destinació</span>
+        <div class="search"><input id="qb" type="search" placeholder="On vas? (p. ex. Igualada)" autocomplete="off" aria-label="Destinació"><div class="results" id="rb" hidden></div></div>
+        <span></span>
+      </div>
+      <button class="btn swap" id="swap" type="button" title="Intercanvia sortida i destinació" aria-label="Intercanvia sortida i destinació">⇅</button>
+    </div>
+    <div class="go">
+      <button class="btn primary" id="go" type="button" disabled>Calcula la ruta</button>
+      <span class="status" id="status">També pots tocar el mapa per triar un punt.</span>
+    </div>
+  </header>
+
+  <section class="summary" id="summary" aria-label="Resum del trajecte"></section>
+
+  <section class="main">
+    <div id="map"></div>
+    <div style="display:grid;gap:10px;min-width:0">
+      <div class="list" id="list" aria-label="Municipis del trajecte"></div>
+    </div>
+  </section>
+
+  <section class="notes">
+    <h2 style="margin-bottom:6px">Com funciona</h2>
+    <ul>
+      <li>La ruta és la més ràpida en cotxe segons <a href="https://project-osrm.org" target="_blank" rel="noopener">OSRM</a> amb dades d'OpenStreetMap. No té en compte el trànsit en temps real.</li>
+      <li>Els municipis i comarques de Catalunya surten dels límits oficials (IGN, 2024). Fora de Catalunya, el nom del lloc el dona <a href="https://nominatim.openstreetmap.org" target="_blank" rel="noopener">Nominatim</a>.</li>
+      <li>El temps és el <b>d'ara</b> (Open-Meteo, l'últim quart d'hora) al punt de la carretera on passes per cada municipi. L'hora de pas és orientativa. Aviat: el temps previst a l'hora que hi arribaràs.</li>
+      <li>És una estimació de models, no d'estacions. Si plou a prop, mira el <a href="./">radar del comparador</a>.</li>
+    </ul>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(() => {
+  const TZ = "Europe/Madrid";
+  const STEP = 150;          // m entre punts de mostreig de la ruta
+  const MIN_RUN = 300;       // m: trams més curts dins un municipi es consideren soroll de la frontera
+  const OUT_CHUNK = 10000;   // m: fora de Catalunya, un punt de temps cada 10 km com a màxim
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  const store = {
+    get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  };
+  async function getJSON(url, opts) {
+    const r = await fetch(url, opts);
+    if (!r.ok) throw new Error(r.status + " " + url);
+    return r.json();
+  }
+  function setStatus(t, err) { const s = $("status"); s.textContent = t; s.classList.toggle("err", !!err); }
+  const fmtKm = (m) => m < 10000 ? (m / 1000).toFixed(1).replace(".", ",") : Math.round(m / 1000);
+  const fmtDur = (s) => { const m = Math.round(s / 60); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")} min`; };
+  const fmtClock = (ms) => new Date(ms).toLocaleTimeString("ca-ES", { hour: "2-digit", minute: "2-digit", timeZone: TZ });
+  const fmt1 = (x) => (Math.round(x * 10) / 10).toString().replace(".", ",");
+
+  // ---------- Municipis de Catalunya (TopoJSON simplificat, IGN 2024) ----------
+  function decodeTopo(t) {
+    const [sx, sy] = t.transform.scale, [tx, ty] = t.transform.translate;
+    const arcs = t.arcs.map(a => { let x = 0, y = 0; return a.map(([dx, dy]) => { x += dx; y += dy; return [x * sx + tx, y * sy + ty]; }); });
+    const arc = (i) => i < 0 ? arcs[~i].slice().reverse() : arcs[i];
+    const ring = (ids) => { const out = []; ids.forEach((i, k) => { const a = arc(i); out.push(...(k ? a.slice(1) : a)); }); return out; };
+    const obj = Object.values(t.objects)[0];
+    return obj.geometries.filter(g => g.arcs).map(g => {
+      const rings = (g.type === "Polygon" ? [g.arcs] : g.arcs).flatMap(p => p.map(ring));
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      rings.forEach(r => r.forEach(([x, y]) => { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }));
+      return { name: g.properties.m, comarca: g.properties.c, rings, bbox: [x0, y0, x1, y1] };
+    });
+  }
+  function inside(f, x, y) {
+    const b = f.bbox; if (x < b[0] || x > b[2] || y < b[1] || y > b[3]) return false;
+    let c = false;
+    for (const r of f.rings) for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+      const [xi, yi] = r[i], [xj, yj] = r[j];
+      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c;
+    }
+    return c;
+  }
+  let munis = null, lastHit = null;
+  const munisReady = getJSON("data/municipis.topo.json").then(t => (munis = decodeTopo(t))).catch(() => (munis = []));
+  function muniAt(lon, lat) {
+    if (lastHit && inside(lastHit, lon, lat)) return lastHit;
+    for (const f of munis) if (inside(f, lon, lat)) return (lastHit = f);
+    return null;
+  }
+
+  // ---------- Codis de temps (WMO) ----------
+  function wx(code, isDay) {
+    const sun = isDay ? "☀️" : "🌙";
+    const T = {
+      0: [sun, "Cel serè"], 1: [isDay ? "🌤️" : "🌙", "Gairebé serè"], 2: ["⛅", "Mig ennuvolat"], 3: ["☁️", "Cobert"],
+      45: ["🌫️", "Boira"], 48: ["🌫️", "Boira gebradora"],
+      51: ["🌦️", "Plugim feble"], 53: ["🌦️", "Plugim"], 55: ["🌧️", "Plugim intens"], 56: ["🧊", "Plugim gelat"], 57: ["🧊", "Plugim gelat"],
+      61: ["🌧️", "Pluja feble"], 63: ["🌧️", "Pluja"], 65: ["🌧️", "Pluja forta"], 66: ["🧊", "Pluja gelada"], 67: ["🧊", "Pluja gelada forta"],
+      71: ["🌨️", "Neu feble"], 73: ["❄️", "Neu"], 75: ["❄️", "Neu forta"], 77: ["🌨️", "Neu granulada"],
+      80: ["🌦️", "Ruixats febles"], 81: ["🌧️", "Ruixats"], 82: ["⛈️", "Ruixats forts"], 85: ["🌨️", "Ruixats de neu"], 86: ["❄️", "Ruixats de neu forts"],
+      95: ["⛈️", "Tempesta"], 96: ["⛈️", "Tempesta amb calamarsa"], 99: ["⛈️", "Tempesta amb calamarsa"],
+    };
+    return T[code] || ["❔", "Desconegut"];
+  }
+  function kind(w) {
+    const c = w.weather_code;
+    if (w.snowfall > 0 || [71, 73, 75, 77, 85, 86].includes(c)) return "snow";
+    if (w.precipitation > 0 || w.rain > 0 || w.showers > 0 || (c >= 51 && c <= 67) || c >= 80) return "wet";
+    return "";
+  }
+  function windTxt(v) {
+    if (v < 6) return "calma"; if (v < 20) return "vent fluix"; if (v < 39) return "vent moderat";
+    if (v < 62) return "vent fort"; return "vent molt fort";
+  }
+  const DIRS = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"];
+  const dirTxt = (deg) => DIRS[Math.round(((deg % 360) + 360) % 360 / 45) % 8];
+
+  // ---------- Geometria ----------
+  function hav(a, b) { // [lon, lat] → metres
+    const R = 6371000, toR = Math.PI / 180;
+    const dLat = (b[1] - a[1]) * toR, dLon = (b[0] - a[0]) * toR;
+    const s = Math.sin(dLat / 2) ** 2 + Math.cos(a[1] * toR) * Math.cos(b[1] * toR) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(s));
+  }
+  // Punts cada STEP metres al llarg de la ruta, amb el temps de viatge acumulat (per a la fase 2).
+  function sample(coords, durs) {
+    const cd = [0], ct = [0];
+    for (let i = 1; i < coords.length; i++) { cd.push(cd[i - 1] + hav(coords[i - 1], coords[i])); ct.push(ct[i - 1] + (durs?.[i - 1] || 0)); }
+    const total = cd.at(-1), out = [];
+    let k = 0;
+    const at = (d) => {
+      while (k < coords.length - 2 && cd[k + 1] < d) k++;
+      const L = cd[k + 1] - cd[k] || 1, f = Math.min(1, Math.max(0, (d - cd[k]) / L));
+      return { d, lon: coords[k][0] + (coords[k + 1][0] - coords[k][0]) * f, lat: coords[k][1] + (coords[k + 1][1] - coords[k][1]) * f, t: ct[k] + (ct[k + 1] - ct[k]) * f };
+    };
+    for (let d = 0; d < total; d += STEP) out.push(at(d));
+    out.push(at(total));
+    return out;
+  }
+  // Agrupa els punts en trams consecutius dins el mateix municipi.
+  function runsOf(samples) {
+    let runs = [];
+    for (const s of samples) {
+      const f = muniAt(s.lon, s.lat), key = f ? f.name + "|" + f.comarca : null;
+      const last = runs.at(-1);
+      if (last && last.key === key) last.pts.push(s); else runs.push({ key, f, pts: [s] });
+    }
+    const len = (r, i) => (runs[i + 1] ? runs[i + 1].pts[0].d : r.pts.at(-1).d) - r.pts[0].d;
+    // Treu els trams molt curts del mig (fregar una frontera) i torna a unir veïns iguals.
+    runs = runs.filter((r, i) => i === 0 || i === runs.length - 1 || len(r, i) >= MIN_RUN);
+    const merged = [];
+    for (const r of runs) { const l = merged.at(-1); if (l && l.key === r.key) l.pts.push(...r.pts); else merged.push(r); }
+    // Fora de Catalunya: talla en trossos de com a màxim OUT_CHUNK.
+    const out = [];
+    for (const r of merged) {
+      if (r.f) { out.push(r); continue; }
+      const n = Math.max(1, Math.round((r.pts.at(-1).d - r.pts[0].d) / OUT_CHUNK));
+      const per = Math.ceil(r.pts.length / n);
+      for (let i = 0; i < r.pts.length; i += per) out.push({ key: null, f: null, pts: r.pts.slice(i, i + per) });
+    }
+    return out.map(r => {
+      const mid = r.pts[Math.floor(r.pts.length / 2)];
+      return { name: r.f?.name, comarca: r.f?.comarca, cat: !!r.f, pts: r.pts, from: r.pts[0].d, to: r.pts.at(-1).d, mid };
+    });
+  }
+
+  // ---------- Serveis ----------
+  async function route(a, b) {
+    const u = `https://router.project-osrm.org/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=full&geometries=geojson&annotations=duration`;
+    const j = await getJSON(u);
+    if (j.code !== "Ok" || !j.routes?.length) throw new Error("No hi ha ruta");
+    const r = j.routes[0];
+    const durs = r.legs.flatMap(l => l.annotation?.duration || []);
+    return { coords: r.geometry.coordinates, durs: durs.length === r.geometry.coordinates.length - 1 ? durs : null, distance: r.distance, duration: r.duration };
+  }
+  const CUR = "temperature_2m,apparent_temperature,precipitation,rain,showers,snowfall,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m,is_day";
+  async function weather(points) {
+    const res = [];
+    for (let i = 0; i < points.length; i += 50) {
+      const ch = points.slice(i, i + 50);
+      const u = `https://api.open-meteo.com/v1/forecast?latitude=${ch.map(p => p.lat.toFixed(4)).join(",")}&longitude=${ch.map(p => p.lon.toFixed(4)).join(",")}&current=${CUR}&timezone=${encodeURIComponent(TZ)}`;
+      const j = await getJSON(u);
+      (Array.isArray(j) ? j : [j]).forEach(x => res.push(x.current));
+    }
+    return res;
+  }
+  let lastNomi = 0;
+  async function nominatim(path) { // màxim 1 petició per segon (norma d'ús de Nominatim)
+    const wait = lastNomi + 1100 - Date.now(); if (wait > 0) await sleep(wait);
+    lastNomi = Date.now();
+    return getJSON(`https://nominatim.openstreetmap.org/${path}&accept-language=ca&format=jsonv2`);
+  }
+  async function reverseName(p) {
+    try {
+      const j = await nominatim(`reverse?lat=${p.lat}&lon=${p.lon}&zoom=10`);
+      const a = j.address || {};
+      return { name: a.city || a.town || a.village || a.municipality || a.hamlet || j.name || "—", comarca: a.county || a.state || a.country || "" };
+    } catch { return null; }
+  }
+
+  // ---------- Origen i destinació ----------
+  let A = store.get("bmc.route.a"), B = store.get("bmc.route.b");
+  function setPoint(which, p) {
+    if (which === "a") { A = p; store.set("bmc.route.a", p); } else { B = p; store.set("bmc.route.b", p); }
+    syncInputs();
+  }
+  function syncInputs() {
+    $("qa").value = A?.name || ""; $("qa").classList.toggle("set", !!A);
+    $("qb").value = B?.name || ""; $("qb").classList.toggle("set", !!B);
+    $("go").disabled = !(A && B);
+    drawEnds();
+  }
+  function placeLabel(r) { return [r.admin2 || r.admin3, r.admin1, r.country_code !== "ES" ? r.country : ""].filter(Boolean).join(", "); }
+  function wireSearch(inp, box, which) {
+    let qt;
+    inp.addEventListener("focus", () => inp.select());
+    inp.addEventListener("input", () => {
+      clearTimeout(qt);
+      if (which === "a") A = null; else B = null;
+      $("go").disabled = true; inp.classList.remove("set");
+      const q = inp.value.trim();
+      if (q.length < 2) { box.hidden = true; return; }
+      qt = setTimeout(async () => {
+        try {
+          const j = await getJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=10&language=ca`);
+          const near = (r) => (r.admin1 === "Catalonia" || r.admin1 === "Catalunya") * 3 + (r.country_code === "AD") * 2 + (["ES", "FR"].includes(r.country_code));
+          let res = (j.results || []).sort((a, b) => near(b) - near(a)).slice(0, 8)
+            .map(r => ({ name: r.name, lat: r.latitude, lon: r.longitude, sub: placeLabel(r) }));
+          if (!res.length) { // adreces i llocs que no són municipis
+            const n = await nominatim(`search?q=${encodeURIComponent(q)}&limit=6&countrycodes=es,ad,fr`);
+            res = n.map(r => ({ name: r.name || r.display_name.split(",")[0], lat: +r.lat, lon: +r.lon, sub: r.display_name.split(",").slice(1, 4).join(",") }));
+          }
+          box.innerHTML = res.length ? res.map((r, i) => `<button type=button data-i=${i}>${esc(r.name)} <span class=status>${esc(r.sub)}</span></button>`).join("") : "<span class=status>Cap resultat</span>";
+          box.hidden = false;
+          box.onclick = (ev) => {
+            const b = ev.target.closest("button"); if (!b) return;
+            const r = res[+b.dataset.i]; box.hidden = true;
+            setPoint(which, { name: r.name, lat: r.lat, lon: r.lon });
+            if (A && B) run(); else (which === "a" ? $("qb") : $("qa")).focus();
+          };
+        } catch { box.innerHTML = "<span class='status err'>Error al cercar</span>"; box.hidden = false; }
+      }, 300);
+    });
+  }
+  wireSearch($("qa"), $("ra"), "a");
+  wireSearch($("qb"), $("rb"), "b");
+  document.addEventListener("click", e => { if (!e.target.closest(".search")) { $("ra").hidden = true; $("rb").hidden = true; } });
+  $("swap").addEventListener("click", () => { const t = A; A = B; B = t; store.set("bmc.route.a", A); store.set("bmc.route.b", B); syncInputs(); if (A && B) run(); });
+  $("go").addEventListener("click", run);
+  $("geo").addEventListener("click", () => {
+    if (!navigator.geolocation) { setStatus("El navegador no permet la ubicació", true); return; }
+    setStatus("Buscant la teva ubicació…");
+    navigator.geolocation.getCurrentPosition(async p => {
+      await munisReady;
+      const f = muniAt(p.coords.longitude, p.coords.latitude);
+      setPoint("a", { name: "La meva ubicació" + (f ? ` (${f.name})` : ""), lat: p.coords.latitude, lon: p.coords.longitude, here: true });
+      setStatus(B ? "" : "Ara tria la destinació.");
+      if (B) run(); else $("qb").focus();
+    }, () => setStatus("No s'ha pogut obtenir la ubicació. Dona permís al navegador o busca el lloc.", true), { timeout: 10000, enableHighAccuracy: false });
+  });
+
+  // ---------- Mapa ----------
+  let map, layer, endsLayer;
+  function initMap() {
+    if (!window.L) { $("map").innerHTML = "<p class=status style='padding:16px'>No s'ha pogut carregar el mapa.</p>"; return; }
+    map = L.map("map").setView([41.7, 1.75], 8);
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", { maxZoom: 18, attribution: "© OpenStreetMap, © CARTO" }).addTo(map);
+    layer = L.layerGroup().addTo(map); endsLayer = L.layerGroup().addTo(map);
+    map.on("click", async (e) => {
+      await munisReady;
+      const f = muniAt(e.latlng.lng, e.latlng.lat);
+      const p = { name: f ? f.name : `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`, lat: e.latlng.lat, lon: e.latlng.lng };
+      const div = document.createElement("div");
+      div.innerHTML = `<b>${esc(p.name)}</b>${f ? `<br><span class=status>${esc(f.comarca)}</span>` : ""}<div class=pbtns><button class=btn data-w=a>Surto d'aquí</button><button class=btn data-w=b>Vaig aquí</button></div>`;
+      div.addEventListener("click", ev => { const b = ev.target.closest("button"); if (!b) return; map.closePopup(); setPoint(b.dataset.w, p); if (A && B) run(); });
+      L.popup().setLatLng(e.latlng).setContent(div).openOn(map);
+    });
+  }
+  const pinIcon = (color) => L.divIcon({ className: "wx-ico", html: `<span class=end-pin style="background:${color}"></span>`, iconSize: [0, 0] });
+  function drawEnds() {
+    if (!map) return;
+    endsLayer.clearLayers();
+    if (A) L.marker([A.lat, A.lon], { icon: pinIcon("#2d7a4b"), title: "Sortida", zIndexOffset: 1000 }).addTo(endsLayer);
+    if (B) L.marker([B.lat, B.lon], { icon: pinIcon("#c0392b"), title: "Destinació", zIndexOffset: 1000 }).addTo(endsLayer);
+  }
+  const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  // ---------- Càlcul i pintat ----------
+  let seq = 0, segs = [], markers = [];
+  async function run() {
+    if (!(A && B)) return;
+    const my = ++seq;
+    $("go").disabled = true;
+    $("summary").innerHTML = ""; $("list").innerHTML = "";
+    layer?.clearLayers();
+    try {
+      setStatus("Calculant la ruta…");
+      const [r] = await Promise.all([route(A, B), munisReady]);
+      if (my !== seq) return;
+      const coords = r.coords;
+      const line = coords.map(([x, y]) => [y, x]);
+      if (map) {
+        L.polyline(line, { color: cssVar("--surface") || "#fff", weight: 9, opacity: .9 }).addTo(layer);
+        L.polyline(line, { color: cssVar("--route"), weight: 5, opacity: .85 }).addTo(layer);
+        map.fitBounds(L.latLngBounds(line), { padding: [30, 30] });
+      }
+      setStatus("Buscant els municipis del trajecte…");
+      lastHit = null;
+      segs = runsOf(sample(coords, r.durs));
+      const t0 = Date.now();
+      segs.forEach(s => { s.eta = t0 + (r.durs ? s.mid.t : r.duration * (s.mid.d / r.distance)) * 1000; });
+      setStatus(`Consultant el temps a ${segs.length} punts…`);
+      const ws = await weather(segs.map(s => s.mid));
+      if (my !== seq) return;
+      segs.forEach((s, i) => { s.w = ws[i]; s.k = s.w ? kind(s.w) : ""; });
+      draw(r);
+      // Noms fora de Catalunya (lent: 1 consulta per segon)
+      const outs = segs.filter(s => !s.cat);
+      for (let i = 0; i < outs.length; i++) {
+        setStatus(`Posant nom als llocs fora de Catalunya (${i + 1}/${outs.length})…`);
+        const n = await reverseName(outs[i].mid);
+        if (my !== seq) return;
+        Object.assign(outs[i], n || { name: `km ${fmtKm(outs[i].mid.d)}`, comarca: "Fora de Catalunya" });
+        draw(r);
+      }
+      setStatus(`Temps d'ara, actualitzat a les ${fmtClock(Date.now())}.`);
+    } catch (e) {
+      if (my !== seq) return;
+      console.error(e);
+      setStatus(String(e.message).startsWith("No hi ha ruta") ? "No he trobat cap ruta en cotxe entre aquests dos punts." : "No s'ha pogut calcular: algun servei no respon. Torna-ho a provar d'aquí a una estona.", true);
+    } finally { if (my === seq) $("go").disabled = !(A && B); }
+  }
+
+  function draw(r) {
+    // Mapa: trams amb pluja o neu pintats a sobre de la ruta + una etiqueta per municipi.
+    if (map) {
+      markers.forEach(m => layer.removeLayer(m)); markers = [];
+      const many = segs.length > 35;
+      segs.forEach((s, i) => {
+        if (s.k) {
+          const pts = s.pts.map(p => [p.lat, p.lon]); if (segs[i + 1]) pts.push([segs[i + 1].pts[0].lat, segs[i + 1].pts[0].lon]);
+          markers.push(L.polyline(pts, { color: cssVar(s.k === "snow" ? "--snow" : "--rain"), weight: 7, opacity: .95 }).addTo(layer));
+        }
+        const w = s.w; const [e] = w ? wx(w.weather_code, w.is_day) : ["❔"];
+        const lab = many && !s.k ? "" : (w ? `${Math.round(w.temperature_2m)}°` : "");
+        const m = L.marker([s.mid.lat, s.mid.lon], { icon: L.divIcon({ className: "wx-ico", html: `<span class="wx-pin ${s.k}"><span class=e>${e}</span>${lab}</span>`, iconSize: [0, 0] }), title: s.name || "" })
+          .bindPopup(() => popupHtml(s)).addTo(layer);
+        m.on("click", () => focusRow(i));
+        s.marker = m; markers.push(m);
+      });
+    }
+    renderSummary(r); renderList();
+  }
+
+  function detail(s) {
+    const w = s.w; if (!w) return "Sense dades de temps";
+    const parts = [];
+    if (s.k === "snow") parts.push(`<span class=s>neu ${fmt1(w.snowfall)} cm/h</span>`);
+    else if (w.precipitation > 0) parts.push(`<span class=r>${fmt1(w.precipitation)} mm</span>`);
+    else parts.push("sense pluja");
+    const wind = w.wind_speed_10m, gust = w.wind_gusts_10m;
+    parts.push(`${gust >= 50 ? "<span class=w>" : "<b>"}${windTxt(wind)} ${Math.round(wind)} km/h ${dirTxt(w.wind_direction_10m)}${gust >= wind + 10 ? `, ràfegues ${Math.round(gust)}` : ""}${gust >= 50 ? "</span>" : "</b>"}`);
+    parts.push(`núvols ${Math.round(w.cloud_cover)}%`);
+    return parts.join(" · ");
+  }
+  function popupHtml(s) {
+    const w = s.w; const [e, t] = w ? wx(w.weather_code, w.is_day) : ["❔", "—"];
+    return `<b>${esc(s.name || "…")}</b> <span class=status>${esc(s.comarca || "")}</span><br>${e} ${t}${w ? `, <b>${fmt1(w.temperature_2m)} °C</b> (sensació ${Math.round(w.apparent_temperature)}°)` : ""}<br>${detail(s)}<br><span class=status>km ${fmtKm(s.mid.d)} · hi passes cap a les ${fmtClock(s.eta)}</span>`;
+  }
+
+  function renderList() {
+    let html = "", com = null;
+    segs.forEach((s, i) => {
+      const c = s.comarca || (s.cat ? "" : "Fora de Catalunya");
+      if (c !== com) { html += `<div class=com>${esc(c || "—")}</div>`; com = c; }
+      const w = s.w; const [e, t] = w ? wx(w.weather_code, w.is_day) : ["❔", "—"];
+      html += `<div class="row ${s.k}" tabindex=0 data-i=${i}><span class=e title="${esc(t)}">${e}</span><span class=n>${esc(s.name || "Buscant el nom…")}<small>km ${fmtKm(s.mid.d)} · ${fmtClock(s.eta)}</small></span><span class=t>${w ? Math.round(w.temperature_2m) + "°" : "–"}</span><span class=d>${esc(t)} · ${detail(s)}</span></div>`;
+    });
+    $("list").innerHTML = html;
+  }
+  function focusRow(i) {
+    const el = $("list").querySelector(`[data-i="${i}"]`);
+    if (el && window.matchMedia("(min-width: 901px)").matches) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+  function openSeg(i) {
+    const s = segs[i]; if (!s || !map) return;
+    map.setView([s.mid.lat, s.mid.lon], Math.max(map.getZoom(), 11));
+    s.marker?.openPopup();
+    if (!window.matchMedia("(min-width: 901px)").matches) $("map").scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+  $("list").addEventListener("click", e => { const r = e.target.closest(".row"); if (r) openSeg(+r.dataset.i); });
+  $("list").addEventListener("keydown", e => { if (e.key === "Enter") { const r = e.target.closest(".row"); if (r) openSeg(+r.dataset.i); } });
+
+  function renderSummary(r) {
+    const ok = segs.filter(s => s.w);
+    const names = (arr) => { const n = arr.map(s => s.name || "…"); return n.length > 4 ? n.slice(0, 4).join(", ") + ` i ${n.length - 4} més` : n.join(", "); };
+    const wet = ok.filter(s => s.k === "wet"), snow = ok.filter(s => s.k === "snow");
+    const cards = [];
+    cards.push(`<div class=card><span class=label>Trajecte</span><div class=verdict>${fmtKm(r.distance)} km · ${fmtDur(r.duration)}</div><div class=facts>${esc(A.name)} → ${esc(B.name)}</div><div class=facts><b>${segs.length}</b> municipis · arribada cap a les <b>${fmtClock(Date.now() + r.duration * 1000)}</b></div></div>`);
+    let v, cls, f;
+    if (snow.length) { v = `Neva a ${snow.length} ${snow.length === 1 ? "lloc" : "llocs"}`; cls = "snow"; f = names(snow); }
+    else if (wet.length) { v = `Plou a ${wet.length} de ${ok.length}`; cls = "wet"; f = names(wet); }
+    else { v = "No plou enlloc"; cls = "ok"; f = "Sec a tot el trajecte, ara mateix"; }
+    if (snow.length && wet.length) f += ` · pluja a ${wet.length} més`;
+    cards.push(`<div class=card><span class=label>Pluja i neu ara</span><div class="verdict ${cls}">${v}</div><div class=facts>${esc(f)}</div></div>`);
+    if (ok.length) {
+      const lo = ok.reduce((a, b) => a.w.temperature_2m <= b.w.temperature_2m ? a : b), hi = ok.reduce((a, b) => a.w.temperature_2m >= b.w.temperature_2m ? a : b);
+      cards.push(`<div class=card><span class=label>Temperatura</span><div class=verdict>${Math.round(lo.w.temperature_2m)}° a ${Math.round(hi.w.temperature_2m)}°</div><div class=facts>Mín. a <b>${esc(lo.name || "…")}</b> · màx. a <b>${esc(hi.name || "…")}</b></div></div>`);
+      const g = ok.reduce((a, b) => a.w.wind_gusts_10m >= b.w.wind_gusts_10m ? a : b);
+      const strong = g.w.wind_gusts_10m >= 50;
+      cards.push(`<div class=card><span class=label>Vent</span><div class="verdict ${strong ? "warn" : ""}">${strong ? "Ràfegues fortes" : g.w.wind_gusts_10m >= 30 ? "Una mica de vent" : "Poc vent"}</div><div class=facts>Màx. a <b>${esc(g.name || "…")}</b>: ${Math.round(g.w.wind_speed_10m)} km/h, ràfegues de <b>${Math.round(g.w.wind_gusts_10m)} km/h</b></div></div>`);
+      const fog = ok.filter(s => [45, 48].includes(s.w.weather_code));
+      const sky = ok.filter(s => s.w.cloud_cover < 40).length;
+      cards.push(`<div class=card><span class=label>Cel</span><div class=verdict>${fog.length ? `Boira a ${fog.length} ${fog.length === 1 ? "lloc" : "llocs"}` : sky > ok.length / 2 ? "Majoritàriament serè" : "Majoritàriament ennuvolat"}</div><div class=facts>${fog.length ? esc(names(fog)) : `<b>${sky}</b> de ${ok.length} amb poc núvol`}</div></div>`);
+    }
+    $("summary").innerHTML = cards.join("");
+  }
+
+  initMap();
+  syncInputs();
+  if (A && B) run();
+})();
+</script>
+</body>
+</html>
