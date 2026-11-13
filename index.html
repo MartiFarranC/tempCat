@@ -75,6 +75,10 @@ button, input { font: inherit; color: inherit; }
 .bigbtn .e { font-size: 1.8rem; }
 .bigbtn small { display: block; font-weight: 400; font-size: .85rem; opacity: .9; }
 .bigbtn .arr { margin-left: auto; font-size: 1.4rem; }
+.myroutes { display: grid; gap: 8px; margin-top: -4px; }
+.myroutes:empty { display: none; }
+.myroutes a { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); color: var(--fg); text-decoration: none; font-weight: 500; }
+.myroutes a .arr { margin-left: auto; color: var(--muted); }
 
 /* Hores i dies */
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px 0 10px; }
@@ -137,6 +141,7 @@ button, input { font: inherit; color: inherit; }
     <span>Mapa de ruta amb el temps<small>On vas? Mira el temps de cada poble del camí</small></span>
     <span class="arr">›</span>
   </a>
+  <nav class="myroutes" id="myroutes" aria-label="Les meves rutes"></nav>
 
   <section class="card"><h2>Pròximes hores</h2><div class="hours" id="hours"></div></section>
   <section class="card"><h2>Pròxims 7 dies</h2><div class="days" id="days"></div></section>
@@ -395,6 +400,10 @@ button, input { font: inherit; color: inherit; }
       }
     }, { timeout: 12000, maximumAge: 5 * 60e3, enableHighAccuracy: false });
   }
+
+  // Rutes guardades a la pàgina de ruta
+  const myr = store.get("bmc.routes") || [];
+  $("myroutes").innerHTML = myr.map(r => `<a href="ruta.html?r=${encodeURIComponent(r.id)}"><span>⭐</span><span>${String(r.name).replace(/[&<>"']/g, c => "&#" + c.charCodeAt(0) + ";")}</span><span class=arr>›</span></a>`).join("");
 
   // Ruta: surt d'on ets ara
   $("routebtn").addEventListener("click", () => {

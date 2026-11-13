@@ -64,6 +64,18 @@ header { display: grid; gap: 14px; }
 .btn:hover { border-color: var(--accent); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); font-weight: 600; }
 .btn:disabled { opacity: .5; cursor: default; }
+.when { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; max-width: 760px; }
+.when .label { width: 74px; margin: 0; }
+.when input[type=time] { padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); min-width: 0; }
+.when input[type=time].set { border-color: var(--accent); }
+.when .day { font-size: .85rem; color: var(--muted); }
+.saved { display: flex; flex-wrap: wrap; gap: 8px; }
+.saved:empty { display: none; }
+.sv { display: inline-flex; align-items: stretch; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); overflow: hidden; max-width: 100%; }
+.sv.on { border-color: var(--accent); }
+.sv button { border: 0; background: none; cursor: pointer; padding: 7px 4px 7px 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sv button.x { padding: 7px 12px 7px 6px; color: var(--muted); }
+.sv button:hover { color: var(--accent); }
 .swap { grid-row: 1 / span 2; grid-column: 2; align-self: center; }
 .go { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .status { font-size: .85rem; color: var(--muted); }
@@ -73,6 +85,7 @@ header { display: grid; gap: 14px; }
   .swap { grid-row: auto; grid-column: auto; justify-self: start; }
   .pt { grid-template-columns: minmax(0, 1fr) auto; }
   .pt .label { grid-column: 1 / -1; }
+  .when .label { width: 100%; }
 }
 
 .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
@@ -119,8 +132,9 @@ header { display: grid; gap: 14px; }
     <nav class="nav"><a href="./">← Inici</a><a href="comparador.html">Comparador de models</a></nav>
     <div>
       <h1>Ruta amb el temps</h1>
-      <p class="sub">Tria d'on surts i on vas. Et dibuixo la ruta més ràpida en cotxe i el temps que fa <b>ara mateix</b> a cada municipi que travesses.</p>
+      <p class="sub">Tria d'on surts i on vas. Et dibuixo la ruta més ràpida en cotxe i el temps que farà a cada municipi <b>a l'hora que hi passaràs</b>. Guarda els trajectes de cada dia i obre'ls amb un toc.</p>
     </div>
+    <div class="saved" id="saved" aria-label="Rutes guardades"></div>
     <div class="points">
       <div class="pt">
         <span class="label">Sortida</span>
@@ -134,8 +148,15 @@ header { display: grid; gap: 14px; }
       </div>
       <button class="btn swap" id="swap" type="button" title="Intercanvia sortida i destinació" aria-label="Intercanvia sortida i destinació">⇅</button>
     </div>
+    <div class="when">
+      <span class="label">Hora</span>
+      <button class="btn" id="wnow" type="button" aria-pressed="true">Surto ara</button>
+      <input type="time" id="wtime" step="300" aria-label="Hora de sortida">
+      <span class="day" id="wday"></span>
+    </div>
     <div class="go">
       <button class="btn primary" id="go" type="button" disabled>Calcula la ruta</button>
+      <button class="btn" id="save" type="button" hidden>☆ Guarda la ruta</button>
       <span class="status" id="status">També pots tocar el mapa per triar un punt.</span>
     </div>
   </header>
@@ -154,7 +175,8 @@ header { display: grid; gap: 14px; }
     <ul>
       <li>La ruta és la més ràpida en cotxe segons <a href="https://project-osrm.org" target="_blank" rel="noopener">OSRM</a> amb dades d'OpenStreetMap. No té en compte el trànsit en temps real.</li>
       <li>Els municipis i comarques de Catalunya surten dels límits oficials (IGN, 2024). Fora de Catalunya, el nom del lloc el dona <a href="https://nominatim.openstreetmap.org" target="_blank" rel="noopener">Nominatim</a>.</li>
-      <li>El temps és el <b>d'ara</b> (Open-Meteo, l'últim quart d'hora) al punt de la carretera on passes per cada municipi. L'hora de pas és orientativa. Aviat: el temps previst a l'hora que hi arribaràs.</li>
+      <li>El temps de cada municipi és la previsió d'Open-Meteo per a l'hora aproximada en què hi passaràs, al punt de la carretera on el travesses. Si hi passes d'aquí menys de mitja hora, és el temps d'ara. L'hora de pas surt de la durada del trajecte sense trànsit.</li>
+      <li>Les rutes guardades es queden en aquest navegador. Cada cop que n'obres una, es torna a calcular per al proper cop que la facis a l'hora triada: avui si encara no l'has acabat, si no, demà.</li>
       <li>És una estimació de models, no d'estacions. Si plou a prop, mira el <a href="./">radar del comparador</a>.</li>
     </ul>
   </section>
@@ -303,13 +325,28 @@ header { display: grid; gap: 14px; }
     return { coords: r.geometry.coordinates, durs: durs.length === r.geometry.coordinates.length - 1 ? durs : null, distance: r.distance, duration: r.duration };
   }
   const CUR = "temperature_2m,apparent_temperature,precipitation,rain,showers,snowfall,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m,is_day";
-  async function weather(points) {
+  const HOURLY = CUR + ",precipitation_probability";
+  const NOW_WIN = 30 * 60e3; // si hi passes d'aquí menys de 30 min, fem servir el temps d'ara
+  const isoH = (ms) => new Date(ms).toISOString().slice(0, 13) + ":00";
+  // Temps a cada punt a l'hora que hi passes (etas en ms). Hores en UTC (timeformat=unixtime).
+  async function weather(points, etas) {
     const res = [];
+    const H = 3600e3, now = Date.now();
+    const t0 = Math.floor(Math.min(...etas) / H) * H - H, t1 = Math.ceil(Math.max(...etas) / H) * H + H;
     for (let i = 0; i < points.length; i += 50) {
       const ch = points.slice(i, i + 50);
-      const u = `https://api.open-meteo.com/v1/forecast?latitude=${ch.map(p => p.lat.toFixed(4)).join(",")}&longitude=${ch.map(p => p.lon.toFixed(4)).join(",")}&current=${CUR}&timezone=${encodeURIComponent(TZ)}`;
+      const u = `https://api.open-meteo.com/v1/forecast?latitude=${ch.map(p => p.lat.toFixed(4)).join(",")}&longitude=${ch.map(p => p.lon.toFixed(4)).join(",")}&current=${CUR}&hourly=${HOURLY}&timezone=GMT&timeformat=unixtime&start_hour=${isoH(t0)}&end_hour=${isoH(t1)}`;
       const j = await getJSON(u);
-      (Array.isArray(j) ? j : [j]).forEach(x => res.push(x.current));
+      (Array.isArray(j) ? j : [j]).forEach((x, k) => {
+        const eta = etas[i + k];
+        if (Math.abs(eta - now) <= NOW_WIN && x.current) { res.push({ ...x.current, src: "now" }); return; }
+        const h = x.hourly; if (!h?.time?.length) { res.push(x.current ? { ...x.current, src: "now" } : null); return; }
+        const at = (ms) => { let b = 0; h.time.forEach((t, n) => { if (Math.abs(t * 1000 - ms) < Math.abs(h.time[b] * 1000 - ms)) b = n; }); return b; };
+        const iNear = at(eta), iSum = at(Math.ceil(eta / H) * H); // la pluja d'una hora va a l'hora on acaba
+        const w = { src: "fc", time: h.time[iNear] * 1000 };
+        for (const key of HOURLY.split(",")) w[key] = h[key]?.[["precipitation", "rain", "showers", "snowfall", "precipitation_probability"].includes(key) ? iSum : iNear];
+        res.push(w);
+      });
     }
     return res;
   }
@@ -420,7 +457,7 @@ header { display: grid; gap: 14px; }
     if (!(A && B)) return;
     const my = ++seq;
     $("go").disabled = true;
-    $("summary").innerHTML = ""; $("list").innerHTML = "";
+    $("summary").innerHTML = ""; $("list").innerHTML = ""; $("save").hidden = true;
     layer?.clearLayers();
     try {
       setStatus("Calculant la ruta…");
@@ -436,10 +473,12 @@ header { display: grid; gap: 14px; }
       setStatus("Buscant els municipis del trajecte…");
       lastHit = null;
       segs = runsOf(sample(coords, r.durs));
-      const t0 = Date.now();
+      const t0 = departAt(r.duration);
+      r.t0 = t0; lastRoute = r; lastRun = Date.now();
       segs.forEach(s => { s.eta = t0 + (r.durs ? s.mid.t : r.duration * (s.mid.d / r.distance)) * 1000; });
-      setStatus(`Consultant el temps a ${segs.length} punts…`);
-      const ws = await weather(segs.map(s => s.mid));
+      showDay(r.duration);
+      setStatus(`Consultant la previsió a ${segs.length} punts…`);
+      const ws = await weather(segs.map(s => s.mid), segs.map(s => s.eta));
       if (my !== seq) return;
       segs.forEach((s, i) => { s.w = ws[i]; s.k = s.w ? kind(s.w) : ""; });
       draw(r);
@@ -452,7 +491,8 @@ header { display: grid; gap: 14px; }
         Object.assign(outs[i], n || { name: `km ${fmtKm(outs[i].mid.d)}`, comarca: "Fora de Catalunya" });
         draw(r);
       }
-      setStatus(`Temps d'ara, actualitzat a les ${fmtClock(Date.now())}.`);
+      setStatus(`Temps a l'hora que hi passes · actualitzat a les ${fmtClock(Date.now())}.`);
+      $("save").hidden = false; renderSaved();
     } catch (e) {
       if (my !== seq) return;
       console.error(e);
@@ -487,6 +527,7 @@ header { display: grid; gap: 14px; }
     if (s.k === "snow") parts.push(`<span class=s>neu ${fmt1(w.snowfall)} cm/h</span>`);
     else if (w.precipitation > 0) parts.push(`<span class=r>${fmt1(w.precipitation)} mm</span>`);
     else parts.push("sense pluja");
+    if (w.src === "fc" && w.precipitation_probability >= 20) parts.push(`<span class=r>prob. ${Math.round(w.precipitation_probability)}%</span>`);
     const wind = w.wind_speed_10m, gust = w.wind_gusts_10m;
     parts.push(`${gust >= 50 ? "<span class=w>" : "<b>"}${windTxt(wind)} ${Math.round(wind)} km/h ${dirTxt(w.wind_direction_10m)}${gust >= wind + 10 ? `, ràfegues ${Math.round(gust)}` : ""}${gust >= 50 ? "</span>" : "</b>"}`);
     parts.push(`núvols ${Math.round(w.cloud_cover)}%`);
@@ -494,7 +535,7 @@ header { display: grid; gap: 14px; }
   }
   function popupHtml(s) {
     const w = s.w; const [e, t] = w ? wx(w.weather_code, w.is_day) : ["❔", "—"];
-    return `<b>${esc(s.name || "…")}</b> <span class=status>${esc(s.comarca || "")}</span><br>${e} ${t}${w ? `, <b>${fmt1(w.temperature_2m)} °C</b> (sensació ${Math.round(w.apparent_temperature)}°)` : ""}<br>${detail(s)}<br><span class=status>km ${fmtKm(s.mid.d)} · hi passes cap a les ${fmtClock(s.eta)}</span>`;
+    return `<b>${esc(s.name || "…")}</b> <span class=status>${esc(s.comarca || "")}</span><br>${e} ${t}${w ? `, <b>${fmt1(w.temperature_2m)} °C</b> (sensació ${Math.round(w.apparent_temperature)}°)` : ""}<br>${detail(s)}<br><span class=status>km ${fmtKm(s.mid.d)} · hi passes cap a les ${fmtClock(s.eta)} · ${w?.src === "fc" ? "previsió per a aquesta hora" : "temps d'ara"}</span>`;
   }
 
   function renderList() {
@@ -525,13 +566,15 @@ header { display: grid; gap: 14px; }
     const names = (arr) => { const n = arr.map(s => s.name || "…"); return n.length > 4 ? n.slice(0, 4).join(", ") + ` i ${n.length - 4} més` : n.join(", "); };
     const wet = ok.filter(s => s.k === "wet"), snow = ok.filter(s => s.k === "snow");
     const cards = [];
-    cards.push(`<div class=card><span class=label>Trajecte</span><div class=verdict>${fmtKm(r.distance)} km · ${fmtDur(r.duration)}</div><div class=facts>${esc(A.name)} → ${esc(B.name)}</div><div class=facts><b>${segs.length}</b> municipis · arribada cap a les <b>${fmtClock(Date.now() + r.duration * 1000)}</b></div></div>`);
+    cards.push(`<div class=card><span class=label>Trajecte</span><div class=verdict>${fmtKm(r.distance)} km · ${fmtDur(r.duration)}</div><div class=facts>${esc(A.name)} → ${esc(B.name)}</div><div class=facts><b>${segs.length}</b> municipis · sortida <b>${fmtClock(r.t0)}</b> · arribada cap a les <b>${fmtClock(r.t0 + r.duration * 1000)}</b></div></div>`);
     let v, cls, f;
     if (snow.length) { v = `Neva a ${snow.length} ${snow.length === 1 ? "lloc" : "llocs"}`; cls = "snow"; f = names(snow); }
     else if (wet.length) { v = `Plou a ${wet.length} de ${ok.length}`; cls = "wet"; f = names(wet); }
-    else { v = "No plou enlloc"; cls = "ok"; f = "Sec a tot el trajecte, ara mateix"; }
+    else { v = "No plou enlloc"; cls = "ok"; f = "Sec a tot el trajecte"; }
+    const pmax = ok.reduce((a, b) => (b.w.precipitation_probability || 0) > (a?.w.precipitation_probability || 0) ? b : a, null);
+    if (!wet.length && !snow.length && pmax?.w.precipitation_probability >= 30) f = `Sec, però prob. de pluja del ${Math.round(pmax.w.precipitation_probability)}% a ${pmax.name || "…"}`;
     if (snow.length && wet.length) f += ` · pluja a ${wet.length} més`;
-    cards.push(`<div class=card><span class=label>Pluja i neu ara</span><div class="verdict ${cls}">${v}</div><div class=facts>${esc(f)}</div></div>`);
+    cards.push(`<div class=card><span class=label>Pluja i neu quan hi passes</span><div class="verdict ${cls}">${v}</div><div class=facts>${esc(f)}</div></div>`);
     if (ok.length) {
       const lo = ok.reduce((a, b) => a.w.temperature_2m <= b.w.temperature_2m ? a : b), hi = ok.reduce((a, b) => a.w.temperature_2m >= b.w.temperature_2m ? a : b);
       cards.push(`<div class=card><span class=label>Temperatura</span><div class=verdict>${Math.round(lo.w.temperature_2m)}° a ${Math.round(hi.w.temperature_2m)}°</div><div class=facts>Mín. a <b>${esc(lo.name || "…")}</b> · màx. a <b>${esc(hi.name || "…")}</b></div></div>`);
@@ -545,10 +588,82 @@ header { display: grid; gap: 14px; }
     $("summary").innerHTML = cards.join("");
   }
 
+  // ---------- Hora de sortida ----------
+  let DEP = store.get("bmc.route.t"); // null = ara, o "HH:MM"
+  let lastRoute = null, lastRun = 0;
+  function departAt(durS) {
+    if (!DEP) return Date.now();
+    const [h, m] = DEP.split(":").map(Number);
+    const d = new Date(); d.setHours(h, m, 0, 0);
+    if (d.getTime() + durS * 1000 < Date.now()) d.setDate(d.getDate() + 1); // el d'avui ja s'ha acabat: demà
+    return d.getTime();
+  }
+  function dayWord(ms) {
+    const d = new Date(ms), t = new Date(); t.setHours(0, 0, 0, 0);
+    const diff = Math.round((new Date(d).setHours(0, 0, 0, 0) - t) / 864e5);
+    return diff === 0 ? "avui" : diff === 1 ? "demà" : d.toLocaleDateString("ca-ES", { weekday: "long", day: "numeric" });
+  }
+  function showDay(durS) {
+    $("wday").textContent = DEP ? `Surts ${dayWord(departAt(durS ?? 0))} a les ${DEP}` : "";
+  }
+  function syncWhen() {
+    $("wnow").setAttribute("aria-pressed", String(!DEP));
+    $("wtime").value = DEP || "";
+    $("wtime").classList.toggle("set", !!DEP);
+    showDay(lastRoute?.duration);
+  }
+  function setDep(v) { DEP = v || null; store.set("bmc.route.t", DEP); syncWhen(); if (A && B) run(); }
+  $("wnow").addEventListener("click", () => setDep(null));
+  $("wtime").addEventListener("change", e => setDep(e.target.value));
+
+  // ---------- Rutes guardades (en aquest navegador) ----------
+  const getRoutes = () => store.get("bmc.routes") || [];
+  const short = (p) => (p.here ? p.name.replace(/^La meva ubicació \((.*)\)$/, "$1") : p.name);
+  const same = (r) => r.a.lat === A?.lat && r.a.lon === A?.lon && r.b.lat === B?.lat && r.b.lon === B?.lon && (r.t || null) === DEP;
+  function renderSaved() {
+    const rs = getRoutes();
+    $("saved").innerHTML = rs.map(r => `<span class="sv${same(r) ? " on" : ""}"><button type=button data-id="${esc(r.id)}">⭐ ${esc(r.name)}</button><button type=button class=x data-del="${esc(r.id)}" aria-label="Esborra ${esc(r.name)}">✕</button></span>`).join("");
+    const saved = rs.some(same);
+    $("save").textContent = saved ? "★ Guardada" : "☆ Guarda la ruta";
+    $("save").disabled = saved;
+  }
+  function openRoute(id) {
+    const r = getRoutes().find(x => x.id === id); if (!r) return false;
+    A = r.a; B = r.b; DEP = r.t || null;
+    store.set("bmc.route.a", A); store.set("bmc.route.b", B); store.set("bmc.route.t", DEP);
+    syncInputs(); syncWhen(); renderSaved(); run();
+    return true;
+  }
+  $("saved").addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.del) {
+      const r = getRoutes().find(x => x.id === b.dataset.del);
+      if (r && confirm(`Esborrar la ruta «${r.name}»?`)) { store.set("bmc.routes", getRoutes().filter(x => x.id !== r.id)); renderSaved(); }
+      return;
+    }
+    openRoute(b.dataset.id);
+  });
+  $("save").addEventListener("click", () => {
+    if (!(A && B)) return;
+    const def = `${short(A)} → ${short(B)}${DEP ? " · " + DEP : ""}`;
+    const name = prompt("Nom de la ruta", def); if (name === null) return;
+    const rs = getRoutes();
+    rs.push({ id: Date.now().toString(36), name: name.trim() || def, a: { ...A, name: short(A), here: false }, b: B, t: DEP });
+    store.set("bmc.routes", rs); renderSaved();
+  });
+  // Si la pàgina torna a primer pla al cap d'una estona (p. ex. l'endemà al matí), recalcula.
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && A && B && Date.now() - lastRun > 15 * 60e3) run(); });
+
   initMap();
   syncInputs();
-  if (location.hash === "#desti") { history.replaceState(null, "", location.pathname); if (!B) $("qb").focus(); }
-  if (A && B) run();
+  syncWhen();
+  renderSaved();
+  const qid = new URLSearchParams(location.search).get("r");
+  if (qid && openRoute(qid)) history.replaceState(null, "", location.pathname);
+  else {
+    if (location.hash === "#desti") { history.replaceState(null, "", location.pathname); if (!B) $("qb").focus(); }
+    if (A && B) run();
+  }
 })();
 </script>
 </body>

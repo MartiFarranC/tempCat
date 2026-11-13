@@ -16,13 +16,11 @@ Pàgina estàtica, sense claus d'API. Publica-la amb GitHub Pages des de la bran
 
 ## Ruta amb el temps (`ruta.html`)
 
-Tries la sortida (ubicació actual, cerca o un clic al mapa) i la destinació. La pàgina dibuixa la ruta més ràpida en cotxe i mostra el temps **actual** a cada municipi que travessa el trajecte, agrupat per comarca: estat del cel, temperatura, pluja o neu, vent i ràfegues, núvols.
+Tries la sortida (ubicació actual, cerca o un clic al mapa) i la destinació. Pots triar l'hora de sortida (o «Surto ara»). La pàgina dibuixa la ruta més ràpida en cotxe i mostra, per a cada municipi que travessa el trajecte, agrupat per comarca, el temps **previst a l'hora que hi passaràs**: estat del cel, temperatura, pluja o neu i probabilitat, vent i ràfegues, núvols. Si hi passes d'aquí menys de 30 minuts, és el temps d'ara.
+
+Les rutes es poden guardar (⭐, en el `localStorage` del navegador, clau `bmc.routes`) i surten també a la portada. Una ruta guardada amb hora de sortida es recalcula cada cop que l'obres per al proper trajecte: avui si encara no l'has acabat, si no, demà.
 
 - Ruta: OSRM (`router.project-osrm.org`), dades d'OpenStreetMap.
 - Municipis i comarques de Catalunya: `data/municipis.topo.json`, límits de l'IGN (2024) simplificats, via [ArnauInes/geometries_cat_bcn_2024](https://github.com/ArnauInes/geometries_cat_bcn_2024). Fora de Catalunya, el nom del lloc ve de Nominatim (màx. 1 consulta/s).
-- Temps: Open-Meteo `current`, consultat al punt de la carretera dins de cada municipi.
+- Temps: Open-Meteo `hourly` (i `current` per als punts de la pròxima mitja hora), consultat al punt de la carretera dins de cada municipi a l'hora de pas estimada amb les durades per tram d'OSRM.
 - Mapa: Leaflet + CARTO/OSM.
-
-## TODO
-
-- [ ] **Fase 2 de la ruta: temps a l'hora d'arribada.** En lloc del temps d'ara a tot arreu, mostrar a cada punt el temps previst per a l'hora en què hi passaràs (sortida = ara, destinació = ara + durada del trajecte). Exemple: Barcelona → Andorra, si són 3 h, a Barcelona el temps d'ara i a Andorra la previsió d'aquí 3 h. Ja es calcula l'hora de pas de cada tram (`s.eta`, a partir de les durades per tram d'OSRM); falta demanar a Open-Meteo `hourly`/`minutely_15` i agafar el valor de l'hora de pas. Opcional: triar l'hora de sortida.
