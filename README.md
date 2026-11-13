@@ -8,6 +8,7 @@ Pensada per al mòbil: només obrir-la, et localitza i mostra el municipi on ets
 
 - Temperatura i humitat d'ara: **mesures reals** de l'estació XEMA del Meteocat més representativa (a menys de 15 km i amb altitud semblant), via les dades obertes de la Generalitat (`analisi.transparenciacatalunya.cat`, datasets `yqwd-vj5e` i `nzvn-apee`). Si no n'hi ha cap de recent, el valor del model.
 - Estat del cel i previsió: Open-Meteo (`best_match`).
+- «Què diuen els models»: per a ara (3 h), la resta d'avui o demà, classifica cada un dels 10 models (Météo-France AROME/ARPEGE, KNMI, DWD ICON-EU, ECMWF IFS i AIFS, Met Office, GFS, GEM) en sol, sol i núvols, ennuvolat, boira, pluja, tempesta o neu, i mostra quants en diu cada cosa. Pluja = ≥ 0,3 mm a la franja; sol/núvols per la nuvolositat mitjana.
 - Municipi: `data/municipis.topo.json`; fora de Catalunya, Nominatim.
 
 ## Comparador de models (`comparador.html`)
