@@ -102,7 +102,15 @@ header { display: grid; gap: 14px; }
 @media (max-width: 900px) { #map { position: relative; top: 0; height: 420px; } }
 .wx-ico { background: none; border: 0; }
 .wx-pin { display: inline-flex; align-items: center; gap: 2px; padding: 1px 6px 1px 3px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 1px 4px rgba(0,0,0,.25); font: 600 12px/1.4 var(--f-body); color: var(--fg); white-space: nowrap; transform: translate(-50%, -50%); position: absolute; }
-.wx-pin.wet { border-color: var(--rain); } .wx-pin.snow { border-color: var(--snow); }
+.wx-pin.wet { border: 2px solid var(--rain); background: color-mix(in srgb, var(--rain) 18%, var(--surface)); }
+.wx-pin.snow { border: 2px solid var(--snow); background: color-mix(in srgb, var(--snow) 18%, var(--surface)); }
+.wx-pin .mm { color: var(--rain); font-weight: 700; margin-left: 3px; }
+.mode { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--accent); font-size: .92rem; }
+.mode:empty { display: none; }
+.mode .e { font-size: 1.4rem; }
+.maplegend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .82rem; color: var(--muted); padding: 2px 2px 0; }
+.maplegend span { display: inline-flex; align-items: center; gap: 6px; }
+.maplegend i { display: inline-block; width: 26px; height: 6px; border-radius: 3px; }
 .wx-pin .e { font-size: 15px; }
 .end-pin { width: 16px; height: 16px; border-radius: 50%; border: 3px solid var(--surface); box-shadow: 0 0 0 1px rgba(0,0,0,.4); transform: translate(-50%, -50%); position: absolute; }
 .leaflet-popup-content { font: 13px/1.45 var(--f-body); }
@@ -117,7 +125,7 @@ header { display: grid; gap: 14px; }
 .row.wet { border-left-color: var(--rain); } .row.snow { border-left-color: var(--snow); }
 .row .e { font-size: 1.5rem; line-height: 1; text-align: center; }
 .row .n { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row .n small { font-weight: 400; color: var(--muted); font-family: var(--f-mono); font-size: .72rem; margin-left: 6px; }
+.row .n small { display: block; font-weight: 400; color: var(--muted); font-family: var(--f-mono); font-size: .72rem; }
 .row .t { font-family: var(--f-display); font-size: 1.25rem; font-variant-numeric: tabular-nums; text-align: right; }
 .row .d { grid-column: 2 / -1; font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .row .d b { color: var(--fg); font-weight: 500; }
@@ -161,10 +169,19 @@ header { display: grid; gap: 14px; }
     </div>
   </header>
 
+  <div class="mode" id="mode" aria-live="polite"></div>
   <section class="summary" id="summary" aria-label="Resum del trajecte"></section>
 
   <section class="main">
-    <div id="map"></div>
+    <div style="display:grid;gap:8px;min-width:0">
+      <div id="map"></div>
+      <div class="maplegend" id="maplegend" hidden>
+        <span><i style="background:var(--rain)"></i>tram on plourà quan hi passis</span>
+        <span><i style="background:var(--snow)"></i>tram on nevarà</span>
+        <span><i style="background:var(--route)"></i>sec</span>
+        <span>Cada etiqueta és un municipi: temps i temperatura a l'hora que hi passes.</span>
+      </div>
+    </div>
     <div style="display:grid;gap:10px;min-width:0">
       <div class="list" id="list" aria-label="Municipis del trajecte"></div>
     </div>
@@ -253,11 +270,21 @@ header { display: grid; gap: 14px; }
     };
     return T[code] || ["❔", "Desconegut"];
   }
+  // Una sola decisió per municipi (recompte, icona, color del tram i llista surten d'aquí).
+  // Pluja = ≥0,2 mm previstos en aquella hora (una traça de 0,1 mm no compta). Si cau en forma de neu, neu.
+  const WET_MM = 0.2;
   function kind(w) {
-    const c = w.weather_code;
-    if (w.snowfall > 0 || [71, 73, 75, 77, 85, 86].includes(c)) return "snow";
-    if (w.precipitation > 0 || w.rain > 0 || w.showers > 0 || (c >= 51 && c <= 67) || c >= 80) return "wet";
+    if (w.snowfall >= 0.1 || (w.precipitation >= WET_MM && [71, 73, 75, 77, 85, 86].includes(w.weather_code))) return "snow";
+    if (w.precipitation >= WET_MM) return "wet";
     return "";
+  }
+  function look(s) { // [emoji, text] coherent amb kind()
+    const w = s.w; if (!w) return ["❔", "Sense dades"];
+    const [e, t] = wx(w.weather_code, w.is_day);
+    if (s.k === "wet" && !((w.weather_code >= 51 && w.weather_code <= 67) || w.weather_code >= 80)) return w.precipitation >= 1 ? ["🌧️", "Pluja"] : ["🌦️", "Pluja feble"];
+    if (s.k === "snow" && ![71, 73, 75, 77, 85, 86].includes(w.weather_code)) return ["🌨️", "Neu"];
+    if (!s.k && w.weather_code >= 51) return ["☁️", "Cobert"];
+    return [e, t];
   }
   function windTxt(v) {
     if (v < 6) return "calma"; if (v < 20) return "vent fluix"; if (v < 39) return "vent moderat";
@@ -457,7 +484,7 @@ header { display: grid; gap: 14px; }
     if (!(A && B)) return;
     const my = ++seq;
     $("go").disabled = true;
-    $("summary").innerHTML = ""; $("list").innerHTML = ""; $("save").hidden = true;
+    $("summary").innerHTML = ""; $("list").innerHTML = ""; $("mode").innerHTML = ""; $("save").hidden = true;
     layer?.clearLayers();
     try {
       setStatus("Calculant la ruta…");
@@ -510,8 +537,8 @@ header { display: grid; gap: 14px; }
           const pts = s.pts.map(p => [p.lat, p.lon]); if (segs[i + 1]) pts.push([segs[i + 1].pts[0].lat, segs[i + 1].pts[0].lon]);
           markers.push(L.polyline(pts, { color: cssVar(s.k === "snow" ? "--snow" : "--rain"), weight: 7, opacity: .95 }).addTo(layer));
         }
-        const w = s.w; const [e] = w ? wx(w.weather_code, w.is_day) : ["❔"];
-        const lab = many && !s.k ? "" : (w ? `${Math.round(w.temperature_2m)}°` : "");
+        const w = s.w; const [e] = look(s);
+        const lab = many && !s.k ? "" : (w ? `${Math.round(w.temperature_2m)}°` : "") + (s.k === "wet" ? `<span class=mm>${fmt1(w.precipitation)} mm</span>` : s.k === "snow" ? `<span class=mm>neu</span>` : "");
         const m = L.marker([s.mid.lat, s.mid.lon], { icon: L.divIcon({ className: "wx-ico", html: `<span class="wx-pin ${s.k}"><span class=e>${e}</span>${lab}</span>`, iconSize: [0, 0] }), title: s.name || "" })
           .bindPopup(() => popupHtml(s)).addTo(layer);
         m.on("click", () => focusRow(i));
@@ -525,16 +552,16 @@ header { display: grid; gap: 14px; }
     const w = s.w; if (!w) return "Sense dades de temps";
     const parts = [];
     if (s.k === "snow") parts.push(`<span class=s>neu ${fmt1(w.snowfall)} cm/h</span>`);
-    else if (w.precipitation > 0) parts.push(`<span class=r>${fmt1(w.precipitation)} mm</span>`);
-    else parts.push("sense pluja");
-    if (w.src === "fc" && w.precipitation_probability >= 20) parts.push(`<span class=r>prob. ${Math.round(w.precipitation_probability)}%</span>`);
+    else if (s.k === "wet") parts.push(`<span class=r>${fmt1(w.precipitation)} mm</span>`);
+    if (s.k !== "wet" && s.k !== "snow") parts.push(w.src === "fc" && w.precipitation_probability >= 20 ? `sense pluja prevista (prob. ${Math.round(w.precipitation_probability)}%)` : "sense pluja");
+    else if (w.src === "fc" && w.precipitation_probability != null) parts.push(`prob. ${Math.round(w.precipitation_probability)}%`);
     const wind = w.wind_speed_10m, gust = w.wind_gusts_10m;
     parts.push(`${gust >= 50 ? "<span class=w>" : "<b>"}${windTxt(wind)} ${Math.round(wind)} km/h ${dirTxt(w.wind_direction_10m)}${gust >= wind + 10 ? `, ràfegues ${Math.round(gust)}` : ""}${gust >= 50 ? "</span>" : "</b>"}`);
     parts.push(`núvols ${Math.round(w.cloud_cover)}%`);
     return parts.join(" · ");
   }
   function popupHtml(s) {
-    const w = s.w; const [e, t] = w ? wx(w.weather_code, w.is_day) : ["❔", "—"];
+    const w = s.w; const [e, t] = look(s);
     return `<b>${esc(s.name || "…")}</b> <span class=status>${esc(s.comarca || "")}</span><br>${e} ${t}${w ? `, <b>${fmt1(w.temperature_2m)} °C</b> (sensació ${Math.round(w.apparent_temperature)}°)` : ""}<br>${detail(s)}<br><span class=status>km ${fmtKm(s.mid.d)} · hi passes cap a les ${fmtClock(s.eta)} · ${w?.src === "fc" ? "previsió per a aquesta hora" : "temps d'ara"}</span>`;
   }
 
@@ -543,8 +570,8 @@ header { display: grid; gap: 14px; }
     segs.forEach((s, i) => {
       const c = s.comarca || (s.cat ? "" : "Fora de Catalunya");
       if (c !== com) { html += `<div class=com>${esc(c || "—")}</div>`; com = c; }
-      const w = s.w; const [e, t] = w ? wx(w.weather_code, w.is_day) : ["❔", "—"];
-      html += `<div class="row ${s.k}" tabindex=0 data-i=${i}><span class=e title="${esc(t)}">${e}</span><span class=n>${esc(s.name || "Buscant el nom…")}<small>km ${fmtKm(s.mid.d)} · ${fmtClock(s.eta)}</small></span><span class=t>${w ? Math.round(w.temperature_2m) + "°" : "–"}</span><span class=d>${esc(t)} · ${detail(s)}</span></div>`;
+      const w = s.w; const [e, t] = look(s);
+      html += `<div class="row ${s.k}" tabindex=0 data-i=${i}><span class=e title="${esc(t)}">${e}</span><span class=n>${esc(s.name || "Buscant el nom…")}<small>km ${fmtKm(s.mid.d)} · hi passes ${fmtClock(s.eta)}</small></span><span class=t>${w ? Math.round(w.temperature_2m) + "°" : "–"}</span><span class=d>${esc(t)} · ${detail(s)}</span></div>`;
     });
     $("list").innerHTML = html;
   }
@@ -568,13 +595,15 @@ header { display: grid; gap: 14px; }
     const cards = [];
     cards.push(`<div class=card><span class=label>Trajecte</span><div class=verdict>${fmtKm(r.distance)} km · ${fmtDur(r.duration)}</div><div class=facts>${esc(A.name)} → ${esc(B.name)}</div><div class=facts><b>${segs.length}</b> municipis · sortida <b>${fmtClock(r.t0)}</b> · arribada cap a les <b>${fmtClock(r.t0 + r.duration * 1000)}</b></div></div>`);
     let v, cls, f;
-    if (snow.length) { v = `Neva a ${snow.length} ${snow.length === 1 ? "lloc" : "llocs"}`; cls = "snow"; f = names(snow); }
-    else if (wet.length) { v = `Plou a ${wet.length} de ${ok.length}`; cls = "wet"; f = names(wet); }
-    else { v = "No plou enlloc"; cls = "ok"; f = "Sec a tot el trajecte"; }
+    const fut = ok.some(s => s.w.src === "fc");
+    const verb = fut ? ["Plourà", "Nevarà", "No plourà"] : ["Plou", "Neva", "No plou"];
+    if (snow.length) { v = `${verb[1]} a ${snow.length} de ${ok.length}`; cls = "snow"; f = names(snow); }
+    else if (wet.length) { v = `${verb[0]} a ${wet.length} de ${ok.length} municipis`; cls = "wet"; f = names(wet); }
+    else { v = `${verb[2]} enlloc`; cls = "ok"; f = "Sec a tot el trajecte"; }
     const pmax = ok.reduce((a, b) => (b.w.precipitation_probability || 0) > (a?.w.precipitation_probability || 0) ? b : a, null);
     if (!wet.length && !snow.length && pmax?.w.precipitation_probability >= 30) f = `Sec, però prob. de pluja del ${Math.round(pmax.w.precipitation_probability)}% a ${pmax.name || "…"}`;
     if (snow.length && wet.length) f += ` · pluja a ${wet.length} més`;
-    cards.push(`<div class=card><span class=label>Pluja i neu quan hi passes</span><div class="verdict ${cls}">${v}</div><div class=facts>${esc(f)}</div></div>`);
+    cards.push(`<div class=card><span class=label>${fut ? "Pluja quan hi passis" : "Pluja ara"}</span><div class="verdict ${cls}">${v}</div><div class=facts>${esc(f)}</div></div>`);
     if (ok.length) {
       const lo = ok.reduce((a, b) => a.w.temperature_2m <= b.w.temperature_2m ? a : b), hi = ok.reduce((a, b) => a.w.temperature_2m >= b.w.temperature_2m ? a : b);
       cards.push(`<div class=card><span class=label>Temperatura</span><div class=verdict>${Math.round(lo.w.temperature_2m)}° a ${Math.round(hi.w.temperature_2m)}°</div><div class=facts>Mín. a <b>${esc(lo.name || "…")}</b> · màx. a <b>${esc(hi.name || "…")}</b></div></div>`);
@@ -586,6 +615,11 @@ header { display: grid; gap: 14px; }
       cards.push(`<div class=card><span class=label>Cel</span><div class=verdict>${fog.length ? `Boira a ${fog.length} ${fog.length === 1 ? "lloc" : "llocs"}` : sky > ok.length / 2 ? "Majoritàriament serè" : "Majoritàriament ennuvolat"}</div><div class=facts>${fog.length ? esc(names(fog)) : `<b>${sky}</b> de ${ok.length} amb poc núvol`}</div></div>`);
     }
     $("summary").innerHTML = cards.join("");
+    const nowN = ok.filter(s => s.w.src !== "fc").length;
+    $("mode").innerHTML = !ok.length ? "" : !fut
+      ? `<span class=e>🕒</span><span><b>Temps d'ara mateix</b> a cada municipi (hi passes en menys de mitja hora).</span>`
+      : `<span class=e>🔮</span><span><b>Previsió per a l'hora que passaràs per cada municipi</b>, sortint ${DEP ? dayWord(r.t0) : "ara"} a les ${fmtClock(r.t0)}. No és el temps que fa ara.${nowN ? ` Els ${nowN} primers municipis, per on passes en menys de mitja hora, mostren el temps d'ara.` : ""}</span>`;
+    $("maplegend").hidden = !ok.length;
   }
 
   // ---------- Hora de sortida ----------
