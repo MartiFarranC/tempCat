@@ -6,7 +6,7 @@
 <title>Ruta amb el temps</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&display=swap">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
 <style>
 /* Layout: capçalera amb origen/destinació, resum del trajecte, mapa amb la ruta i llista de municipis travessats amb el temps actual. */
 :root {
@@ -105,6 +105,10 @@ header { display: grid; gap: 14px; }
 .wx-pin.wet { border: 2px solid var(--rain); background: color-mix(in srgb, var(--rain) 18%, var(--surface)); }
 .wx-pin.snow { border: 2px solid var(--snow); background: color-mix(in srgb, var(--snow) 18%, var(--surface)); }
 .wx-pin .mm { color: var(--rain); font-weight: 700; margin-left: 3px; }
+.wx-pin .gu { color: var(--warn); font-weight: 700; margin-left: 4px; }
+.wx-pin.gust { box-shadow: 0 0 0 2px var(--warn), 0 1px 4px rgba(0,0,0,.25); }
+.wx-pin.gust.vgust { box-shadow: 0 0 0 3px #c0392b, 0 1px 4px rgba(0,0,0,.25); }
+.wx-pin.gust .gu.v { color: #c0392b; }
 .mode { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--accent); font-size: .92rem; }
 .mode:empty { display: none; }
 .mode .e { font-size: 1.4rem; }
@@ -178,6 +182,8 @@ header { display: grid; gap: 14px; }
       <div class="maplegend" id="maplegend" hidden>
         <span><i style="background:var(--rain)"></i>tram on plourà quan hi passis</span>
         <span><i style="background:var(--snow)"></i>tram on nevarà</span>
+        <span><i style="background:repeating-linear-gradient(90deg,var(--warn) 0 6px,transparent 6px 10px)"></i>💨 ràfegues fortes (50 km/h o més)</span>
+        <span><i style="background:repeating-linear-gradient(90deg,#c0392b 0 6px,transparent 6px 10px)"></i>💨 ràfegues molt fortes (70 km/h o més)</span>
         <span><i style="background:var(--route)"></i>sec</span>
         <span>Cada etiqueta és un municipi: temps i temperatura a l'hora que hi passes.</span>
       </div>
@@ -199,7 +205,7 @@ header { display: grid; gap: 14px; }
   </section>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="vendor/leaflet/leaflet.js"></script>
 <script>
 (() => {
   const TZ = "Europe/Madrid";
@@ -273,6 +279,7 @@ header { display: grid; gap: 14px; }
   // Una sola decisió per municipi (recompte, icona, color del tram i llista surten d'aquí).
   // Pluja = ≥0,2 mm previstos en aquella hora (una traça de 0,1 mm no compta). Si cau en forma de neu, neu.
   const WET_MM = 0.2;
+  const GUST_STRONG = 50, GUST_VSTRONG = 70; // km/h
   function kind(w) {
     if (w.snowfall >= 0.1 || (w.precipitation >= WET_MM && [71, 73, 75, 77, 85, 86].includes(w.weather_code))) return "snow";
     if (w.precipitation >= WET_MM) return "wet";
@@ -343,9 +350,20 @@ header { display: grid; gap: 14px; }
   }
 
   // ---------- Serveis ----------
+  // Dos servidors OSRM públics: si el primer falla o triga, provem el de FOSSGIS (routing.openstreetmap.de).
+  const ROUTERS = ["https://router.project-osrm.org/route/v1/driving/", "https://routing.openstreetmap.de/routed-car/route/v1/driving/"];
   async function route(a, b) {
-    const u = `https://router.project-osrm.org/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=full&geometries=geojson&annotations=duration`;
-    const j = await getJSON(u);
+    let j = null, err;
+    for (const base of ROUTERS) {
+      try {
+        const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 15000);
+        try { j = await getJSON(`${base}${a.lon.toFixed(6)},${a.lat.toFixed(6)};${b.lon.toFixed(6)},${b.lat.toFixed(6)}?overview=full&geometries=geojson&annotations=duration`, { signal: ctl.signal }); }
+        finally { clearTimeout(t); }
+        if (j.code === "Ok" && j.routes?.length) break;
+        if (j.code === "NoRoute") break;
+      } catch (e) { err = e; j = null; }
+    }
+    if (!j) throw err || new Error("servei de rutes");
     if (j.code !== "Ok" || !j.routes?.length) throw new Error("No hi ha ruta");
     const r = j.routes[0];
     const durs = r.legs.flatMap(l => l.annotation?.duration || []);
@@ -452,12 +470,24 @@ header { display: grid; gap: 14px; }
     }, () => setStatus("No s'ha pogut obtenir la ubicació. Dona permís al navegador o busca el lloc.", true), { timeout: 10000, enableHighAccuracy: false });
   });
 
+  // Mapa base: OpenStreetMap; si les seves imatges no carreguen, CARTO com a reserva.
+  function baseLayer(m, extraAttr) {
+    const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>' + (extraAttr || "") });
+    let ok = 0, bad = 0, switched = false;
+    osm.on("tileload", () => ok++);
+    osm.on("tileerror", () => {
+      if (switched || ++bad < 4 || ok) return;
+      switched = true; m.removeLayer(osm);
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", { maxZoom: 18, attribution: "© OpenStreetMap, © CARTO" + (extraAttr || "") }).addTo(m);
+    });
+    return osm.addTo(m);
+  }
   // ---------- Mapa ----------
   let map, layer, endsLayer;
   function initMap() {
     if (!window.L) { $("map").innerHTML = "<p class=status style='padding:16px'>No s'ha pogut carregar el mapa.</p>"; return; }
     map = L.map("map").setView([41.7, 1.75], 8);
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", { maxZoom: 18, attribution: "© OpenStreetMap, © CARTO" }).addTo(map);
+    baseLayer(map);
     layer = L.layerGroup().addTo(map); endsLayer = L.layerGroup().addTo(map);
     map.on("click", async (e) => {
       await munisReady;
@@ -537,9 +567,15 @@ header { display: grid; gap: 14px; }
           const pts = s.pts.map(p => [p.lat, p.lon]); if (segs[i + 1]) pts.push([segs[i + 1].pts[0].lat, segs[i + 1].pts[0].lon]);
           markers.push(L.polyline(pts, { color: cssVar(s.k === "snow" ? "--snow" : "--rain"), weight: 7, opacity: .95 }).addTo(layer));
         }
+        const g = s.w?.wind_gusts_10m || 0, gl = g >= GUST_VSTRONG ? 2 : g >= GUST_STRONG ? 1 : 0;
+        if (gl) { // ràfegues fortes: traç discontinu taronja (o vermell) a sobre del tram
+          const pts = s.pts.map(p => [p.lat, p.lon]); if (segs[i + 1]) pts.push([segs[i + 1].pts[0].lat, segs[i + 1].pts[0].lon]);
+          markers.push(L.polyline(pts, { color: gl === 2 ? "#c0392b" : cssVar("--warn"), weight: 4, opacity: 1, dashArray: "8 8", lineCap: "butt" }).addTo(layer));
+        }
         const w = s.w; const [e] = look(s);
-        const lab = many && !s.k ? "" : (w ? `${Math.round(w.temperature_2m)}°` : "") + (s.k === "wet" ? `<span class=mm>${fmt1(w.precipitation)} mm</span>` : s.k === "snow" ? `<span class=mm>neu</span>` : "");
-        const m = L.marker([s.mid.lat, s.mid.lon], { icon: L.divIcon({ className: "wx-ico", html: `<span class="wx-pin ${s.k}"><span class=e>${e}</span>${lab}</span>`, iconSize: [0, 0] }), title: s.name || "" })
+        const lab = (many && !s.k && !gl ? "" : (w ? `${Math.round(w.temperature_2m)}°` : "") + (s.k === "wet" ? `<span class=mm>${fmt1(w.precipitation)} mm</span>` : s.k === "snow" ? `<span class=mm>neu</span>` : ""))
+          + (gl ? `<span class="gu${gl === 2 ? " v" : ""}">💨${Math.round(g)}</span>` : "");
+        const m = L.marker([s.mid.lat, s.mid.lon], { icon: L.divIcon({ className: "wx-ico", html: `<span class="wx-pin ${s.k}${gl ? " gust" : ""}${gl === 2 ? " vgust" : ""}"><span class=e>${e}</span>${lab}</span>`, iconSize: [0, 0] }), title: s.name || "" })
           .bindPopup(() => popupHtml(s)).addTo(layer);
         m.on("click", () => focusRow(i));
         s.marker = m; markers.push(m);
@@ -556,7 +592,7 @@ header { display: grid; gap: 14px; }
     if (s.k !== "wet" && s.k !== "snow") parts.push(w.src === "fc" && w.precipitation_probability >= 20 ? `sense pluja prevista (prob. ${Math.round(w.precipitation_probability)}%)` : "sense pluja");
     else if (w.src === "fc" && w.precipitation_probability != null) parts.push(`prob. ${Math.round(w.precipitation_probability)}%`);
     const wind = w.wind_speed_10m, gust = w.wind_gusts_10m;
-    parts.push(`${gust >= 50 ? "<span class=w>" : "<b>"}${windTxt(wind)} ${Math.round(wind)} km/h ${dirTxt(w.wind_direction_10m)}${gust >= wind + 10 ? `, ràfegues ${Math.round(gust)}` : ""}${gust >= 50 ? "</span>" : "</b>"}`);
+    parts.push(`${gust >= GUST_STRONG ? "<span class=w>💨 " : "<b>"}${windTxt(wind)} ${Math.round(wind)} km/h ${dirTxt(w.wind_direction_10m)}${gust >= wind + 10 ? `, ràfegues ${Math.round(gust)}` : ""}${gust >= GUST_STRONG ? "</span>" : "</b>"}`);
     parts.push(`núvols ${Math.round(w.cloud_cover)}%`);
     return parts.join(" · ");
   }
@@ -608,8 +644,8 @@ header { display: grid; gap: 14px; }
       const lo = ok.reduce((a, b) => a.w.temperature_2m <= b.w.temperature_2m ? a : b), hi = ok.reduce((a, b) => a.w.temperature_2m >= b.w.temperature_2m ? a : b);
       cards.push(`<div class=card><span class=label>Temperatura</span><div class=verdict>${Math.round(lo.w.temperature_2m)}° a ${Math.round(hi.w.temperature_2m)}°</div><div class=facts>Mín. a <b>${esc(lo.name || "…")}</b> · màx. a <b>${esc(hi.name || "…")}</b></div></div>`);
       const g = ok.reduce((a, b) => a.w.wind_gusts_10m >= b.w.wind_gusts_10m ? a : b);
-      const strong = g.w.wind_gusts_10m >= 50;
-      cards.push(`<div class=card><span class=label>Vent</span><div class="verdict ${strong ? "warn" : ""}">${strong ? "Ràfegues fortes" : g.w.wind_gusts_10m >= 30 ? "Una mica de vent" : "Poc vent"}</div><div class=facts>Màx. a <b>${esc(g.name || "…")}</b>: ${Math.round(g.w.wind_speed_10m)} km/h, ràfegues de <b>${Math.round(g.w.wind_gusts_10m)} km/h</b></div></div>`);
+      const gusty = ok.filter(s => s.w.wind_gusts_10m >= GUST_STRONG), strong = gusty.length > 0;
+      cards.push(`<div class=card><span class=label>Vent${fut ? " quan hi passis" : ""}</span><div class="verdict ${strong ? "warn" : ""}">${strong ? `💨 Ràfegues fortes a ${gusty.length} de ${ok.length}` : g.w.wind_gusts_10m >= 30 ? "Una mica de vent" : "Poc vent"}</div>${strong ? `<div class=facts>${esc(names(gusty))}</div>` : ""}<div class=facts>Màx. a <b>${esc(g.name || "…")}</b>: ${Math.round(g.w.wind_speed_10m)} km/h, ràfegues de <b>${Math.round(g.w.wind_gusts_10m)} km/h</b></div></div>`);
       const fog = ok.filter(s => [45, 48].includes(s.w.weather_code));
       const sky = ok.filter(s => s.w.cloud_cover < 40).length;
       cards.push(`<div class=card><span class=label>Cel</span><div class=verdict>${fog.length ? `Boira a ${fog.length} ${fog.length === 1 ? "lloc" : "llocs"}` : sky > ok.length / 2 ? "Majoritàriament serè" : "Majoritàriament ennuvolat"}</div><div class=facts>${fog.length ? esc(names(fog)) : `<b>${sky}</b> de ${ok.length} amb poc núvol`}</div></div>`);

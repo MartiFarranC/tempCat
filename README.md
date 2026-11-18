@@ -24,4 +24,6 @@ Les rutes es poden guardar (⭐, en el `localStorage` del navegador, clau `bmc.r
 - Ruta: OSRM (`router.project-osrm.org`), dades d'OpenStreetMap.
 - Municipis i comarques de Catalunya: `data/municipis.topo.json`, límits de l'IGN (2024) simplificats, via [ArnauInes/geometries_cat_bcn_2024](https://github.com/ArnauInes/geometries_cat_bcn_2024). Fora de Catalunya, el nom del lloc ve de Nominatim (màx. 1 consulta/s).
 - Temps: Open-Meteo `hourly` (i `current` per als punts de la pròxima mitja hora), consultat al punt de la carretera dins de cada municipi a l'hora de pas estimada amb les durades per tram d'OSRM.
-- Mapa: Leaflet + CARTO/OSM.
+- Mapa: Leaflet 1.9.4 servit des del mateix repo (`vendor/leaflet/`, sense CDN) amb les imatges d'OpenStreetMap (`tile.openstreetmap.org`); si no carreguen, CARTO de reserva.
+- Ruta: si `router.project-osrm.org` falla o triga més de 15 s, es prova `routing.openstreetmap.de`.
+- Ràfegues: els trams amb ràfegues de 50 km/h o més es marquen al mapa amb traç discontinu taronja (vermell a partir de 70 km/h) i 💨 a l'etiqueta.

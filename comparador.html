@@ -6,7 +6,7 @@
 <title>Comparador de pluja</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&display=swap">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
 <style>
 /* Layout: capçalera amb cercador, resum per finestres de temps, graella hora × model (heatmap), radar i enllaços. */
 :root {
@@ -221,7 +221,7 @@ table.score { border-collapse: collapse; width: 100%; font-variant-numeric: tabu
   </section>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="vendor/leaflet/leaflet.js"></script>
 <script>
 (() => {
   const TZ = "Europe/Madrid";
@@ -461,12 +461,24 @@ table.score { border-collapse: collapse; width: 100%; font-variant-numeric: tabu
     $("links").innerHTML = L.map(([t, u, s]) => `<a href="${u}" target="_blank" rel="noopener">${t}<span>${s}</span></a>`).join("");
   }
 
+  // Mapa base: OpenStreetMap; si les seves imatges no carreguen, CARTO com a reserva.
+  function baseLayer(m, extraAttr) {
+    const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>' + (extraAttr || "") });
+    let ok = 0, bad = 0, switched = false;
+    osm.on("tileload", () => ok++);
+    osm.on("tileerror", () => {
+      if (switched || ++bad < 4 || ok) return;
+      switched = true; m.removeLayer(osm);
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", { maxZoom: 18, attribution: "© OpenStreetMap, © CARTO" + (extraAttr || "") }).addTo(m);
+    });
+    return osm.addTo(m);
+  }
   // ---------- Radar ----------
   let map, marker, layers = [], frames = [], cur = 0, timer = null;
   function initMap() {
     if (!window.L) { $("map").innerHTML = "<p class=status style='padding:16px'>No s'ha pogut carregar el mapa. Fes servir els enllaços de radar.</p>"; return; }
     map = L.map("map", { zoomControl: true, attributionControl: true }).setView([loc.lat, loc.lon], 8);
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", { maxZoom: 12, attribution: "© OpenStreetMap, © CARTO, radar © RainViewer" }).addTo(map);
+    baseLayer(map, ", radar © RainViewer");
     marker = L.circleMarker([loc.lat, loc.lon], { radius: 7, color: "#c0392b", weight: 2, fillOpacity: .3 }).addTo(map);
     loadRadar();
     setInterval(loadRadar, 10 * 60e3);
