@@ -115,6 +115,9 @@ header { display: grid; gap: 14px; }
 .maplegend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .82rem; color: var(--muted); padding: 2px 2px 0; }
 .maplegend span { display: inline-flex; align-items: center; gap: 6px; }
 .maplegend i { display: inline-block; width: 26px; height: 6px; border-radius: 3px; }
+.maplegend .lg-note { flex-basis: 100%; }
+.mapopts { display: flex; align-items: center; gap: 8px; font-size: .9rem; cursor: pointer; user-select: none; }
+.mapopts input { width: 18px; height: 18px; accent-color: var(--accent); }
 .wx-pin .e { font-size: 15px; }
 .end-pin { width: 16px; height: 16px; border-radius: 50%; border: 3px solid var(--surface); box-shadow: 0 0 0 1px rgba(0,0,0,.4); transform: translate(-50%, -50%); position: absolute; }
 .leaflet-popup-content { font: 13px/1.45 var(--f-body); }
@@ -126,7 +129,7 @@ header { display: grid; gap: 14px; }
 .com:first-child { border-top: 0; }
 .row { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 2px 10px; padding: 8px 14px; cursor: pointer; align-items: center; border-left: 3px solid transparent; }
 .row:hover, .row:focus-visible { background: var(--dry); }
-.row.wet { border-left-color: var(--rain); } .row.snow { border-left-color: var(--snow); }
+.row { border-left-width: 5px; }
 .row .e { font-size: 1.5rem; line-height: 1; text-align: center; }
 .row .n { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row .n small { display: block; font-weight: 400; color: var(--muted); font-family: var(--f-mono); font-size: .72rem; }
@@ -179,14 +182,8 @@ header { display: grid; gap: 14px; }
   <section class="main">
     <div style="display:grid;gap:8px;min-width:0">
       <div id="map"></div>
-      <div class="maplegend" id="maplegend" hidden>
-        <span><i style="background:var(--rain)"></i>tram on plourà quan hi passis</span>
-        <span><i style="background:var(--snow)"></i>tram on nevarà</span>
-        <span><i style="background:repeating-linear-gradient(90deg,var(--warn) 0 6px,transparent 6px 10px)"></i>💨 ràfegues fortes (50 km/h o més)</span>
-        <span><i style="background:repeating-linear-gradient(90deg,#c0392b 0 6px,transparent 6px 10px)"></i>💨 ràfegues molt fortes (70 km/h o més)</span>
-        <span><i style="background:var(--route)"></i>sec</span>
-        <span>Cada etiqueta és un municipi: temps i temperatura a l'hora que hi passes.</span>
-      </div>
+      <label class="mapopts"><input type="checkbox" id="showicons"> Mostra les icones del temps al mapa</label>
+      <div class="maplegend" id="maplegend" hidden></div>
     </div>
     <div style="display:grid;gap:10px;min-width:0">
       <div class="list" id="list" aria-label="Municipis del trajecte"></div>
@@ -285,6 +282,31 @@ header { display: grid; gap: 14px; }
     if (w.precipitation >= WET_MM) return "wet";
     return "";
   }
+  // Un color per a cada tipus de previsió (color de la línia del recorregut i de la vora de la llista).
+  const CATS = {
+    clear:   { c: "#f2b705", t: "Sol / cel serè" },
+    night:   { c: "#2c3e78", t: "Serè (de nit)" },
+    partly:  { c: "#9cc3e0", t: "Mig ennuvolat" },
+    overcast:{ c: "#8a96a3", t: "Cobert" },
+    fog:     { c: "#c3a9c9", t: "Boira" },
+    rain:    { c: "#2e86de", t: "Pluja" },
+    heavy:   { c: "#1b3f9e", t: "Pluja forta (2 mm o més)" },
+    storm:   { c: "#7d2fa8", t: "Tempesta" },
+    snow:    { c: "#e05aa6", t: "Neu" },
+    none:    { c: "#9aa5ad", t: "Sense dades" },
+  };
+  function cat(s) {
+    const w = s.w; if (!w) return "none";
+    const c = w.weather_code;
+    if (s.k === "snow") return "snow";
+    if (s.k === "wet") return c >= 95 ? "storm" : w.precipitation >= 2 ? "heavy" : "rain";
+    if (c === 45 || c === 48) return "fog";
+    if (c === 3 || w.cloud_cover >= 80 || c >= 51) return "overcast";
+    if (c === 2 || w.cloud_cover >= 40) return "partly";
+    return w.is_day === 0 ? "night" : "clear";
+  }
+  const hex2 = (h) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const mix = (a, b, t) => "#" + hex2(a).map((v, i) => Math.round(v + (hex2(b)[i] - v) * t).toString(16).padStart(2, "0")).join("");
   function look(s) { // [emoji, text] coherent amb kind()
     const w = s.w; if (!w) return ["❔", "Sense dades"];
     const [e, t] = wx(w.weather_code, w.is_day);
@@ -524,7 +546,7 @@ header { display: grid; gap: 14px; }
       const line = coords.map(([x, y]) => [y, x]);
       if (map) {
         L.polyline(line, { color: cssVar("--surface") || "#fff", weight: 9, opacity: .9 }).addTo(layer);
-        L.polyline(line, { color: cssVar("--route"), weight: 5, opacity: .85 }).addTo(layer);
+        L.polyline(line, { color: cssVar("--route"), weight: 5, opacity: .35 }).addTo(layer);
         map.fitBounds(L.latLngBounds(line), { padding: [30, 30] });
       }
       setStatus("Buscant els municipis del trajecte…");
@@ -558,30 +580,76 @@ header { display: grid; gap: 14px; }
   }
 
   function draw(r) {
-    // Mapa: trams amb pluja o neu pintats a sobre de la ruta + una etiqueta per municipi.
+    // Mapa: la línia del recorregut es pinta amb el color de la previsió de cada municipi, amb degradat
+    // als canvis; les icones de temps només si la casella està marcada.
+    segs.forEach(s => { s.cat = cat(s); });
     if (map) {
       markers.forEach(m => layer.removeLayer(m)); markers = [];
+      drawColoredRoute();
+      const icons = $("showicons").checked;
       const many = segs.length > 35;
       segs.forEach((s, i) => {
-        if (s.k) {
-          const pts = s.pts.map(p => [p.lat, p.lon]); if (segs[i + 1]) pts.push([segs[i + 1].pts[0].lat, segs[i + 1].pts[0].lon]);
-          markers.push(L.polyline(pts, { color: cssVar(s.k === "snow" ? "--snow" : "--rain"), weight: 7, opacity: .95 }).addTo(layer));
-        }
         const g = s.w?.wind_gusts_10m || 0, gl = g >= GUST_VSTRONG ? 2 : g >= GUST_STRONG ? 1 : 0;
         if (gl) { // ràfegues fortes: traç discontinu taronja (o vermell) a sobre del tram
           const pts = s.pts.map(p => [p.lat, p.lon]); if (segs[i + 1]) pts.push([segs[i + 1].pts[0].lat, segs[i + 1].pts[0].lon]);
-          markers.push(L.polyline(pts, { color: gl === 2 ? "#c0392b" : cssVar("--warn"), weight: 4, opacity: 1, dashArray: "8 8", lineCap: "butt" }).addTo(layer));
+          // per sota de la línia: es veu com una vora discontínua i no tapa el color de la previsió
+          markers.push(L.polyline(pts, { color: gl === 2 ? "#c0392b" : cssVar("--warn"), weight: 17, opacity: 1, dashArray: "6 6", lineCap: "butt", interactive: false }).addTo(layer).bringToBack());
         }
         const w = s.w; const [e] = look(s);
         const lab = (many && !s.k && !gl ? "" : (w ? `${Math.round(w.temperature_2m)}°` : "") + (s.k === "wet" ? `<span class=mm>${fmt1(w.precipitation)} mm</span>` : s.k === "snow" ? `<span class=mm>neu</span>` : ""))
           + (gl ? `<span class="gu${gl === 2 ? " v" : ""}">💨${Math.round(g)}</span>` : "");
+        s.marker = null;
+        if (!icons) return;
         const m = L.marker([s.mid.lat, s.mid.lon], { icon: L.divIcon({ className: "wx-ico", html: `<span class="wx-pin ${s.k}${gl ? " gust" : ""}${gl === 2 ? " vgust" : ""}"><span class=e>${e}</span>${lab}</span>`, iconSize: [0, 0] }), title: s.name || "" })
           .bindPopup(() => popupHtml(s)).addTo(layer);
         m.on("click", () => focusRow(i));
         s.marker = m; markers.push(m);
       });
     }
-    renderSummary(r); renderList();
+    renderSummary(r); renderList(); renderLegend();
+  }
+
+  // Color de cada punt de la ruta: el del seu municipi, i a prop d'un canvi, barreja dels dos (degradat).
+  const BLEND = 1200; // m a cada costat de la frontera
+  function drawColoredRoute() {
+    const pts = []; // {lat, lon, color, i}
+    segs.forEach((s, i) => s.pts.forEach(p => pts.push({ p, i })));
+    const bounds = segs.slice(1).map((s, i) => {
+      const a = segs[i], b = s, len = (x) => Math.max(1, x.to - x.from);
+      return { d: b.from, D: Math.min(BLEND, len(a) * .45, len(b) * .45), ca: CATS[a.cat].c, cb: CATS[b.cat].c };
+    });
+    let bi = 0;
+    const colorAt = (d, i) => {
+      while (bi < bounds.length - 1 && bounds[bi].d + bounds[bi].D < d) bi++;
+      for (const k of [bi - 1, bi, bi + 1]) {
+        const q = bounds[k]; if (!q || q.ca === q.cb) continue;
+        if (d >= q.d - q.D && d <= q.d + q.D) return mix(q.ca, q.cb, Math.round(((d - (q.d - q.D)) / (2 * q.D)) * 8) / 8);
+      }
+      return CATS[segs[i].cat].c;
+    };
+    // Trossos consecutius del mateix color en una sola línia; clic = temps d'aquell municipi.
+    let cur = null;
+    const flush = () => { if (cur && cur.ll.length > 1) {
+      const pl = L.polyline(cur.ll, { color: cur.c, weight: 7, opacity: 1, lineCap: "round", lineJoin: "round" }).addTo(layer);
+      const si = cur.i; pl.on("click", (e) => { L.DomEvent.stopPropagation(e); openSeg(si, e.latlng); focusRow(si); });
+      markers.push(pl);
+    } };
+    pts.forEach(({ p, i }) => {
+      const c = colorAt(p.d, i), ll = [p.lat, p.lon];
+      if (cur && cur.c === c) { cur.ll.push(ll); return; }
+      if (cur) cur.ll.push(ll); // tanca el forat entre trossos
+      flush(); cur = { c, i, ll: [ll] };
+    });
+    flush();
+  }
+  function renderLegend() {
+    const ok = segs.filter(s => s.w); const el = $("maplegend");
+    el.hidden = !ok.length; if (!ok.length) { el.innerHTML = ""; return; }
+    const n = {}; segs.forEach(s => { n[s.cat] = (n[s.cat] || 0) + 1; });
+    el.innerHTML = Object.keys(CATS).filter(k => n[k]).map(k => `<span><i style="background:${CATS[k].c}"></i>${CATS[k].t} <b>${n[k]}</b></span>`).join("")
+      + `<span><i style="height:10px;background:linear-gradient(#0000 3px,#fff 3px 7px,#0000 7px),repeating-linear-gradient(90deg,var(--warn) 0 5px,transparent 5px 9px)"></i>💨 vora taronja: ràfegues de 50 km/h o més</span>`
+      + `<span><i style="height:10px;background:linear-gradient(#0000 3px,#fff 3px 7px,#0000 7px),repeating-linear-gradient(90deg,#c0392b 0 5px,transparent 5px 9px)"></i>💨 vora vermella: 70 km/h o més</span>`
+      + `<span class=lg-note>Color de la línia = previsió a l'hora que passes per cada municipi (el número és quants municipis). Toca la línia per veure'n el detall.</span>`;
   }
 
   function detail(s) {
@@ -607,7 +675,7 @@ header { display: grid; gap: 14px; }
       const c = s.comarca || (s.cat ? "" : "Fora de Catalunya");
       if (c !== com) { html += `<div class=com>${esc(c || "—")}</div>`; com = c; }
       const w = s.w; const [e, t] = look(s);
-      html += `<div class="row ${s.k}" tabindex=0 data-i=${i}><span class=e title="${esc(t)}">${e}</span><span class=n>${esc(s.name || "Buscant el nom…")}<small>km ${fmtKm(s.mid.d)} · hi passes ${fmtClock(s.eta)}</small></span><span class=t>${w ? Math.round(w.temperature_2m) + "°" : "–"}</span><span class=d>${esc(t)} · ${detail(s)}</span></div>`;
+      html += `<div class="row ${s.k}" style="border-left-color:${CATS[s.cat || "none"].c}" tabindex=0 data-i=${i}><span class=e title="${esc(t)}">${e}</span><span class=n>${esc(s.name || "Buscant el nom…")}<small>km ${fmtKm(s.mid.d)} · hi passes ${fmtClock(s.eta)}</small></span><span class=t>${w ? Math.round(w.temperature_2m) + "°" : "–"}</span><span class=d>${esc(t)} · ${detail(s)}</span></div>`;
     });
     $("list").innerHTML = html;
   }
@@ -615,10 +683,11 @@ header { display: grid; gap: 14px; }
     const el = $("list").querySelector(`[data-i="${i}"]`);
     if (el && window.matchMedia("(min-width: 901px)").matches) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
-  function openSeg(i) {
+  function openSeg(i, at) {
     const s = segs[i]; if (!s || !map) return;
-    map.setView([s.mid.lat, s.mid.lon], Math.max(map.getZoom(), 11));
-    s.marker?.openPopup();
+    if (!at) map.setView([s.mid.lat, s.mid.lon], Math.max(map.getZoom(), 11));
+    if (s.marker) s.marker.openPopup(); else L.popup().setLatLng(at || [s.mid.lat, s.mid.lon]).setContent(popupHtml(s)).openOn(map);
+    if (at) return;
     if (!window.matchMedia("(min-width: 901px)").matches) $("map").scrollIntoView({ behavior: "smooth", block: "center" });
   }
   $("list").addEventListener("click", e => { const r = e.target.closest(".row"); if (r) openSeg(+r.dataset.i); });
@@ -655,7 +724,7 @@ header { display: grid; gap: 14px; }
     $("mode").innerHTML = !ok.length ? "" : !fut
       ? `<span class=e>🕒</span><span><b>Temps d'ara mateix</b> a cada municipi (hi passes en menys de mitja hora).</span>`
       : `<span class=e>🔮</span><span><b>Previsió per a l'hora que passaràs per cada municipi</b>, sortint ${DEP ? dayWord(r.t0) : "ara"} a les ${fmtClock(r.t0)}. No és el temps que fa ara.${nowN ? ` Els ${nowN} primers municipis, per on passes en menys de mitja hora, mostren el temps d'ara.` : ""}</span>`;
-    $("maplegend").hidden = !ok.length;
+
   }
 
   // ---------- Hora de sortida ----------
@@ -723,6 +792,9 @@ header { display: grid; gap: 14px; }
   });
   // Si la pàgina torna a primer pla al cap d'una estona (p. ex. l'endemà al matí), recalcula.
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && A && B && Date.now() - lastRun > 15 * 60e3) run(); });
+
+  $("showicons").checked = !!store.get("bmc.route.icons");
+  $("showicons").addEventListener("change", e => { store.set("bmc.route.icons", e.target.checked); if (segs.length && lastRoute) draw(lastRoute); });
 
   initMap();
   syncInputs();

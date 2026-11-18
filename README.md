@@ -26,4 +26,5 @@ Les rutes es poden guardar (⭐, en el `localStorage` del navegador, clau `bmc.r
 - Temps: Open-Meteo `hourly` (i `current` per als punts de la pròxima mitja hora), consultat al punt de la carretera dins de cada municipi a l'hora de pas estimada amb les durades per tram d'OSRM.
 - Mapa: Leaflet 1.9.4 servit des del mateix repo (`vendor/leaflet/`, sense CDN) amb les imatges d'OpenStreetMap (`tile.openstreetmap.org`); si no carreguen, CARTO de reserva.
 - Ruta: si `router.project-osrm.org` falla o triga més de 15 s, es prova `routing.openstreetmap.de`.
-- Ràfegues: els trams amb ràfegues de 50 km/h o més es marquen al mapa amb traç discontinu taronja (vermell a partir de 70 km/h) i 💨 a l'etiqueta.
+- Línia del recorregut: un color per a cada tipus de previsió (sol, mig ennuvolat, cobert, boira, pluja, pluja forta, tempesta, neu) a l'hora de pas, amb degradat de 1,2 km a cada costat dels canvis. Les icones de temps al mapa només surten si es marca la casella (es recorda al navegador).
+- Ràfegues: els trams amb ràfegues de 50 km/h o més tenen una vora discontínua taronja (vermella a partir de 70 km/h).
