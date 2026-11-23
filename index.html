@@ -121,6 +121,7 @@ button, input { font: inherit; color: inherit; }
 .h .p { font-size: .8125rem; color: var(--rain); font-weight: 600; min-height: 1.1em; }
 .h.newday .t { color: var(--fg); font-weight: 600; }
 .days { display: grid; }
+.h, .d, .hours { position: relative; } /* conté els .sr i evita scroll horitzontal */
 .d { display: grid; grid-template-columns: 5.4em 2em 3.2em minmax(0, 1fr); align-items: center; gap: 8px; padding: 9px 16px; font-variant-numeric: tabular-nums; }
 .d + .d { border-top: 1px solid var(--line); }
 .d .n { font-weight: 500; text-transform: capitalize; }
@@ -137,7 +138,77 @@ button, input { font: inherit; color: inherit; }
 .more a span { color: var(--muted); font-size: .85rem; text-align: right; }
 .status { font-size: .85rem; color: var(--muted); text-align: center; min-height: 1.2em; }
 .status.err { color: var(--warn); }
-.foot { font-size: .8125rem; line-height: 1.5; color: var(--muted); text-align: center; }
+.bottom { display: grid; gap: 14px; }
+.foot { margin: 0; font-size: .8125rem; line-height: 1.5; color: var(--muted); text-align: center; }
+/* ---------- Tauleta i escriptori: tot en una pantalla, sense scroll (§7.3, §19.1, §20) ---------- */
+@media (min-width: 760px) {
+  body { padding-top: max(20px, env(safe-area-inset-top, 0px)); padding-bottom: 20px; }
+  .wrap {
+    max-width: 1100px; gap: 16px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "top    search"
+      "now    days"
+      "rain   days"
+      "route  days"
+      "myr    days"
+      "cons   hours"
+      "status status"
+      "bottom bottom";
+    align-items: start;
+  }
+  .top { grid-area: top; } .search { grid-area: search; align-self: center; } .now { grid-area: now; }
+  .rainmsg { grid-area: rain; } .bigbtn { grid-area: route; } .myroutes { grid-area: myr; margin-top: 0; }
+  .cons { grid-area: cons; } .hourscard { grid-area: hours; } .dayscard { grid-area: days; align-self: stretch; }
+  .bottom { grid-area: bottom; }
+  .more { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+  .status { grid-area: status; }
+  .dayscard { display: flex; flex-direction: column; }
+  .days { flex: 1; grid-auto-rows: minmax(0, 1fr); }
+}
+@media (min-width: 1100px) {
+  html, body { height: 100%; }
+  body { padding-bottom: 16px; }
+  .wrap {
+    max-width: 1480px; min-height: 100%;
+    grid-template-columns: minmax(300px, 1fr) minmax(320px, 1.1fr) minmax(320px, 1fr);
+    grid-template-rows: auto auto auto auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "top    top    search"
+      "now    cons   days"
+      "rain   cons   days"
+      "route  cons   days"
+      "myr    cons   days"
+      "hours  hours  hours"
+      "bottom bottom bottom";
+  }
+  /* A escriptori el cercador sempre és visible (§23.3): sense botó de lupa */
+  .wrap > #searchbox[hidden] { display: block !important; }
+  #find { display: none; }
+  .top { grid-area: top; }
+  .status { grid-area: top; justify-self: center; align-self: center; padding: 0 !important; }
+  .cons { align-self: stretch; align-content: start; }
+  .top h1 { font-size: 2rem; }
+  /* Les 24 hores caben senceres a l'amplada, sense lliscar */
+  .hours { overflow-x: visible; padding: 0 12px 4px; }
+  .h { flex: 1 1 0; width: auto; min-width: 0; }
+  .bottom { display: flex; gap: 16px; align-items: center; }
+  .more { display: flex; gap: 8px; flex: none; }
+  .more a { min-height: 44px; padding: 8px 14px; white-space: nowrap; }
+  .foot { flex: 1; min-width: 0; text-align: right; font-size: .75rem; }
+}
+/* Pantalles baixes (portàtils): una mica més compacte perquè no calgui scroll */
+@media (min-width: 1100px) and (max-height: 860px) {
+  body { padding-top: 12px; padding-bottom: 12px; }
+  .wrap { gap: 12px; }
+  .now { padding: 14px 18px 12px; }
+  .now .temp { font-size: 4rem; }
+  .now .icon { font-size: 3.2rem; }
+  .rainmsg { padding: 10px 14px; }
+  .bigbtn { padding: 12px 16px; }
+  .card { padding: 10px 0 6px; }
+  .h .i { font-size: 1.3rem; }
+}
 /* Estats: hover només amb ratolí; pressió visible a l'instant (§3.4, §23.1). */
 @media (hover: hover) {
   .ibtn:hover, .myroutes a:hover, .more a:hover { border-color: var(--accent); }
@@ -197,16 +268,18 @@ button, input { font: inherit; color: inherit; }
   </a>
   <nav class="myroutes" id="myroutes" aria-label="Les meves rutes"></nav>
 
-  <section class="card" aria-labelledby="h-hours"><h2 id="h-hours">Pròximes hores</h2><div class="hours" id="hours" tabindex="0" role="list" aria-label="Pròximes hores (desplaça horitzontalment)"></div></section>
-  <section class="card" aria-labelledby="h-days"><h2 id="h-days">Pròxims 7 dies</h2><div class="days" id="days" role="list"></div></section>
+  <section class="card hourscard" aria-labelledby="h-hours"><h2 id="h-hours">Pròximes hores</h2><div class="hours" id="hours" tabindex="0" role="list" aria-label="Pròximes hores (desplaça horitzontalment)"></div></section>
+  <section class="card dayscard" aria-labelledby="h-days"><h2 id="h-days">Pròxims 7 dies</h2><div class="days" id="days" role="list"></div></section>
 
   <div class="status" id="status" role="status"></div>
 
+<footer class="bottom">
   <nav class="more" aria-label="Més eines">
     <a id="meteocat" href="https://www.meteo.cat/prediccio/municipal" target="_blank" rel="noopener">Previsió oficial del Meteocat<span>meteo.cat ↗<span class="sr"> (s'obre en una pestanya nova)</span></span></a>
     <a href="comparador.html">Comparador de models de pluja<span>avançat</span></a>
   </nav>
   <p class="foot">Temperatura i humitat: estacions XEMA del Meteocat (dades obertes). Estat del cel i previsió: Open-Meteo (millor model per a cada zona). «Què diuen els models»: 10 models de Météo-France, ECMWF, DWD, Met Office, NOAA, KNMI i Canadà via Open-Meteo (Meteocat i AEMET no publiquen les dades per model).</p>
+  </footer>
 </main>
 
 <script src="ui.js" defer></script>

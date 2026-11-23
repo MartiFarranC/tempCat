@@ -62,6 +62,13 @@ button, input, select { font: inherit; color: inherit; }
 header { display: grid; gap: 14px; }
 .nav { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 4px; }
 .nav a { display: inline-flex; align-items: center; min-height: 44px; }
+/* Escriptori: títol a l'esquerra i controls a la dreta, perquè la graella surti abans (§19.1) */
+@media (min-width: 1100px) {
+  header { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 32px; align-items: start; }
+  header > div:first-child { grid-row: 1 / span 3; }
+  header .search { max-width: none; }
+  .place { grid-column: 1 / -1; }
+}
 .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .search { position: relative; flex: 1 1 260px; min-width: 0; max-width: 420px; }
 .search input { width: 100%; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }

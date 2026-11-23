@@ -55,7 +55,7 @@ button, input { font: inherit; color: inherit; }
 
 header { display: grid; gap: 14px; }
 .points { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; max-width: 760px; align-items: center; }
-.pt { display: grid; grid-template-columns: 74px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.pt { display: grid; grid-template-columns: 88px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
 .pt .label { margin: 0; }
 .search { position: relative; min-width: 0; }
 .search input { width: 100%; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
@@ -69,7 +69,7 @@ header { display: grid; gap: 14px; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); font-weight: 600; }
 .btn:disabled { opacity: .5; cursor: default; }
 .when { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; max-width: 760px; }
-.when .label { width: 74px; margin: 0; }
+.when .label { width: 88px; margin: 0; }
 .when input[type=time] { padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); min-width: 0; }
 .when input[type=time].set { border-color: var(--accent); }
 .when .day { font-size: .85rem; color: var(--muted); }
@@ -104,6 +104,21 @@ header { display: grid; gap: 14px; }
 @media (max-width: 900px) { .main { grid-template-columns: minmax(0, 1fr); } }
 #map { height: min(70vh, 620px); min-height: 360px; border-radius: 10px; border: 1px solid var(--line); background: var(--dry); position: sticky; top: 12px; }
 @media (max-width: 900px) { #map { position: relative; top: 0; height: 420px; } }
+.mapcol { display: grid; gap: 8px; min-width: 0; }
+.listcol { display: grid; gap: 10px; min-width: 0; }
+/* Escriptori: com una app de mapes. Controls i resultats a l'esquerra, mapa a tota l'alçada a la dreta (§19.1, §20). */
+@media (min-width: 1100px) {
+  body { padding-block: 16px; }
+  .wrap { max-width: none; grid-template-columns: minmax(380px, 460px) minmax(0, 1fr); gap: 0 24px; align-items: start; }
+  .wrap > :not(.main) { grid-column: 1; margin-bottom: 16px; }
+  .main { display: contents; }
+  .mapcol { grid-column: 2; grid-row: 1 / span 6; position: sticky; top: 16px; height: calc(100vh - 32px); height: calc(100dvh - 32px); grid-template-rows: minmax(0, 1fr) auto auto; }
+  #map { position: static; height: auto; min-height: 0; }
+  .listcol { grid-column: 1; }
+  h1 { font-size: 1.6rem; }
+  .sub { font-size: .9375rem; }
+  .summary { grid-template-columns: minmax(0, 1fr); }
+}
 .wx-ico { background: none; border: 0; }
 .wx-pin { display: inline-flex; align-items: center; gap: 2px; padding: 1px 6px 1px 3px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 1px 4px rgba(0,0,0,.25); font: 600 12px/1.4 var(--f-body); color: var(--fg); white-space: nowrap; transform: translate(-50%, -50%); position: absolute; }
 .wx-pin.wet { border: 2px solid var(--rain); background: color-mix(in srgb, var(--rain) 18%, var(--surface)); }
@@ -144,6 +159,12 @@ header { display: grid; gap: 14px; }
 .row .d .r { color: var(--rain); font-weight: 600; } .row .d .s { color: var(--snow); font-weight: 600; } .row .d .w { color: var(--warn); font-weight: 600; }
 .notes { color: var(--muted); font-size: .85rem; max-width: 80ch; }
 .notes li { margin-bottom: 4px; }
+.notes summary { display: flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; }
+.notes summary h2 { display: inline; color: var(--fg); }
+.notes summary::after { content: "▾"; color: var(--muted); }
+.notes[open] summary::after { content: "▴"; }
+.notes summary::-webkit-details-marker { display: none; }
+.notes summary { list-style: none; }
 /* Mides de toc, estats i moviment segons docs/guia-disseny.md (§3.1, §15.2, §14.9). */
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .btn, select.btn, .search input, input[type=time] { min-height: 44px; }
@@ -196,18 +217,18 @@ header { display: grid; gap: 14px; }
   <section class="summary" id="summary" aria-label="Resum del trajecte"></section>
 
   <section class="main">
-    <div style="display:grid;gap:8px;min-width:0">
+    <div class="mapcol">
       <div id="map"></div>
       <label class="mapopts"><input type="checkbox" id="showicons"> Mostra les icones del temps al mapa</label>
       <div class="maplegend" id="maplegend" hidden></div>
     </div>
-    <div style="display:grid;gap:10px;min-width:0">
+    <div class="listcol">
       <div class="list" id="list" role="region" aria-label="Municipis del trajecte"></div>
     </div>
   </section>
 
-  <section class="notes">
-    <h2 style="margin-bottom:6px">Com funciona</h2>
+  <details class="notes">
+    <summary><h2>Com funciona</h2></summary>
     <ul>
       <li>La ruta és la més ràpida en cotxe segons <a href="https://project-osrm.org" target="_blank" rel="noopener">OSRM</a> amb dades d'OpenStreetMap. No té en compte el trànsit en temps real.</li>
       <li>Els municipis i comarques de Catalunya surten dels límits oficials (IGN, 2024). Fora de Catalunya, el nom del lloc el dona <a href="https://nominatim.openstreetmap.org" target="_blank" rel="noopener">Nominatim</a>.</li>
@@ -215,7 +236,7 @@ header { display: grid; gap: 14px; }
       <li>Les rutes guardades es queden en aquest navegador. Cada cop que n'obres una, es torna a calcular per al proper cop que la facis a l'hora triada: avui si encara no l'has acabat, si no, demà.</li>
       <li>És una estimació de models, no d'estacions. Si plou a prop, mira el <a href="./">radar del comparador</a>.</li>
     </ul>
-  </section>
+  </details>
 </main>
 
 <script src="vendor/leaflet/leaflet.js"></script>
