@@ -285,7 +285,7 @@ button, input { font: inherit; color: inherit; }
       <span class="rtime" id="rtime" aria-live="off"></span>
       <button class="ibtn sm" id="rplay" type="button" hidden></button>
     </div>
-    <div id="rmap" role="img" aria-label="Mapa del radar de pluja de les últimes dues hores al voltant del lloc"></div>
+    <div id="rmap" role="img" aria-label="Mapa del radar de pluja de les últimes dues hores al voltant del lloc. Es pot moure i ampliar"></div>
   </section>
 
   <section class="card hourscard" aria-labelledby="h-hours"><h2 id="h-hours">Pròximes hores</h2><div class="hours" id="hours" tabindex="0" role="list" aria-label="Pròximes hores (desplaça horitzontalment)"></div></section>
@@ -628,7 +628,7 @@ button, input { font: inherit; color: inherit; }
   const radar = { map: null, dot: null, layers: [], frames: [], cur: 0, timer: null, want: !matchMedia("(prefers-reduced-motion: reduce)").matches };
   function radarInit(l) {
     if (!window.L) { $("rmap").outerHTML = "<p class=rmsg>No s'ha pogut carregar el mapa del radar.</p>"; return; }
-    const m = radar.map = L.map("rmap", { zoomControl: true, attributionControl: true, dragging: false, scrollWheelZoom: false, touchZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false }).setView([l.lat, l.lon], 8);
+    const m = radar.map = L.map("rmap", { zoomControl: true, attributionControl: true, scrollWheelZoom: false, minZoom: 5, maxZoom: 10 }).setView([l.lat, l.lon], 8);
     m.attributionControl.setPrefix(false);
     const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap · radar © RainViewer" });
     let ok = 0, bad = 0, switched = false;
