@@ -60,8 +60,37 @@ button, input, select { font: inherit; color: inherit; }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 
 header { display: grid; gap: 14px; }
-.nav { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 4px; }
-.nav a { display: inline-flex; align-items: center; min-height: 44px; }
+.ico { width: 22px; height: 22px; display: block; flex: none; }
+.btn.icon { width: 44px; padding: 0; display: inline-grid; place-items: center; }
+
+/* Menú: a dalt com a botons al mòbil; columna fixa a l'esquerra a l'escriptori (§12, §23.3) */
+.layout { max-width: 1280px; margin: 0 auto; display: grid; gap: 16px; }
+.layout > * { min-width: 0; }
+.side ul { list-style: none; margin: 0; padding: 0; }
+.pages { display: flex; flex-wrap: wrap; gap: 8px; }
+.pages a {
+  display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 14px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--fg); text-decoration: none; font-weight: 500;
+}
+.pages a[aria-current="page"] { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.side-h, .toc { display: none; }
+@media (min-width: 1100px) {
+  .layout { max-width: 1520px; grid-template-columns: 220px minmax(0, 1fr); gap: 32px; align-items: start; }
+  .side { position: sticky; top: 20px; display: grid; gap: 6px; }
+  .pages { flex-direction: column; flex-wrap: nowrap; gap: 6px; }
+  .pages a { border-color: transparent; background: none; }
+  .pages a[aria-current="page"] { background: var(--accent); color: var(--surface); }
+  .side-h { display: block; margin: 18px 14px 4px; font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+  .toc { display: grid; gap: 2px; }
+  .toc a { display: flex; align-items: center; min-height: 40px; padding: 6px 14px; border-radius: 8px; color: var(--fg); text-decoration: none; font-size: .9375rem; }
+  .wrap { max-width: none; margin: 0; }
+}
+@media (hover: hover) {
+  .pages a:not([aria-current]):hover { border-color: var(--accent); }
+  .side .pages a:not([aria-current]):hover, .toc a:hover { background: var(--dry); }
+}
+html { scroll-padding-top: 16px; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
 /* Escriptori: títol a l'esquerra i controls a la dreta, perquè la graella surti abans (§19.1) */
 @media (min-width: 1100px) {
   header { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 32px; align-items: start; }
@@ -157,20 +186,35 @@ table.score { border-collapse: collapse; width: 100%; font-variant-numeric: tabu
 </style>
 </head>
 <body>
+<div class="layout">
+<nav class="side" aria-label="Menú">
+  <ul class="pages">
+    <li><a href="./"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 11 12 4l8 7v9h-5v-6H9v6H4z"/></svg><span>Inici</span></a></li>
+    <li><a href="ruta.html"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 18H16a3 3 0 0 0 0-6H8a3 3 0 0 1 0-6h7.5"/></svg><span>Ruta amb el temps</span></a></li>
+    <li><a href="comparador.html" aria-current="page"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V10M10 20V4M15 20v-7M20 20V8"/></svg><span>Comparador</span></a></li>
+  </ul>
+  <p class="side-h" id="idx-h">En aquesta pàgina</p>
+  <ul class="toc" aria-labelledby="idx-h">
+    <li><a href="#summary">Resum</a></li>
+    <li><a href="#models">Models hora a hora</a></li>
+    <li><a href="#verif">Qui l'ha encertat?</a></li>
+    <li><a href="#radar">Radar i fonts oficials</a></li>
+    <li><a href="#notes">Com llegir-ho</a></li>
+  </ul>
+</nav>
 <main class="wrap">
   <header>
     <div>
       <h1>Comparador de pluja</h1>
       <p class="sub">Tots els models gratuïts, hora a hora, per al mateix punt. Si els models no es posen d'acord, no et fiïs de cap previsió concreta: mira el radar i porta paraigua.</p>
-      <nav class="nav" aria-label="Altres pàgines"><a href="./">← Inici</a><a href="ruta.html"><b><span aria-hidden="true">🗺️</span> Ruta amb el temps</b></a></nav>
     </div>
     <div class="controls">
       <div class="search">
         <input id="q" type="search" placeholder="Busca un municipi (p. ex. Vic, Olot, Reus…)" autocomplete="off" aria-label="Busca un municipi">
         <div class="results" id="results" hidden></div>
       </div>
-      <button class="btn" id="geo" type="button"><span aria-hidden="true">📍</span> La meva ubicació</button>
-      <button class="btn" id="reload" type="button">Actualitza</button>
+      <button class="btn icon" id="geo" type="button" aria-label="Fes servir la meva ubicació" title="La meva ubicació"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+      <button class="btn icon" id="reload" type="button" aria-label="Actualitza les dades" title="Actualitza"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><path d="M20 4v5h-5"/></svg></button>
       <select class="btn" id="span" aria-label="Horitzó">
         <option value="24">24 h</option>
         <option value="48" selected>48 h</option>
@@ -178,13 +222,12 @@ table.score { border-collapse: collapse; width: 100%; font-variant-numeric: tabu
         <option value="120">5 dies</option>
       </select>
     </div>
-    <div class="chips" id="presets"></div>
     <div class="place"><strong id="pname">—</strong><span id="pcoord"></span><span class="status" id="status" role="status"></span></div>
   </header>
 
   <section class="summary" id="summary" aria-label="Resum"></section>
 
-  <section>
+  <section id="models" aria-label="Models hora a hora">
     <div class="gridwrap" id="gridwrap"><table class="g" id="grid"></table></div>
     <div class="legend">
       <span class="sw"><i style="background:var(--dry)"></i>sec (&lt;0,1 mm)</span>
@@ -216,7 +259,7 @@ table.score { border-collapse: collapse; width: 100%; font-variant-numeric: tabu
     <div class="gridwrap"><table class="score" id="score"></table></div>
   </section>
 
-  <section class="two">
+  <section class="two" id="radar">
     <div style="display:grid;gap:10px;min-width:0">
       <h2>Radar (RainViewer)</h2>
       <div id="map"></div>
@@ -232,7 +275,7 @@ table.score { border-collapse: collapse; width: 100%; font-variant-numeric: tabu
     </div>
   </section>
 
-  <section class="notes">
+  <section class="notes" id="notes">
     <h2 style="margin-bottom:6px">Com llegir-ho</h2>
     <ul>
       <li>Cada fila és un model numèric diferent, servit gratis per <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a>. Cada casella és la pluja d'aquella hora (de l'hora indicada a la següent), en mm.</li>
@@ -242,18 +285,13 @@ table.score { border-collapse: collapse; width: 100%; font-variant-numeric: tabu
     </ul>
   </section>
 </main>
+</div>
 
 <script src="vendor/leaflet/leaflet.js"></script>
 <script src="ui.js" defer></script>
 <script>
 (() => {
   const TZ = "Europe/Madrid";
-  const PRESETS = [
-    ["Barcelona", 41.3874, 2.1686], ["Girona", 41.9794, 2.8214], ["Lleida", 41.6176, 0.6200],
-    ["Tarragona", 41.1189, 1.2445], ["Manresa", 41.7286, 1.8268], ["Vic", 41.9302, 2.2546],
-    ["Sabadell", 41.5463, 2.1086], ["Figueres", 42.2665, 2.9615], ["Tortosa", 40.8125, 0.5216],
-    ["Olot", 42.1822, 2.4890], ["Puigcerdà", 42.4317, 1.9280], ["Vielha", 42.7020, 0.7958],
-  ];
   // Models deterministes (Open-Meteo forecast API). Un per petició, perquè si un falla no s'emporti els altres.
   const MODELS = [
     { group: "Alta resolució (millors per a xàfecs, 1-2 dies)" },
@@ -536,8 +574,6 @@ table.score { border-collapse: collapse; width: 100%; font-variant-numeric: tabu
 
   // ---------- Ubicació ----------
   function setLoc(l) { loc = l; store.set("bmc.loc", l); load(); }
-  $("presets").innerHTML = PRESETS.map(([n], i) => `<button class=chip type=button data-i=${i}>${n}</button>`).join("");
-  $("presets").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; const [name, lat, lon] = PRESETS[+b.dataset.i]; setLoc({ name, lat, lon }); });
   let qt;
   $("q").addEventListener("input", e => {
     clearTimeout(qt);

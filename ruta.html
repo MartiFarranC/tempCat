@@ -92,7 +92,15 @@ header { display: grid; gap: 14px; }
   .when .label { width: 100%; }
 }
 
-.summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.summary { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+/* Resum: el trajecte a dalt i quatre xifres directes en graella 2×2 (4 en fila si hi ha lloc) */
+.minis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (min-width: 760px) and (max-width: 1099px) { .minis { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.mini { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 2px; align-content: start; min-width: 0; }
+.mini .big { display: flex; align-items: center; gap: 8px; font-family: var(--f-display); font-size: 1.2rem; line-height: 1.15; font-weight: 700; }
+.mini .big .e { font-size: 1.5rem; flex: none; }
+.mini .big.wet { color: var(--rain); } .mini .big.snow { color: var(--snow); } .mini .big.warn { color: var(--warn); } .mini .big.ok { color: var(--ok); }
+.mini .facts { overflow-wrap: anywhere; }
 .summary:empty { display: none; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; display: grid; gap: 4px; align-content: start; }
 .verdict { font-family: var(--f-display); font-size: 1.3rem; line-height: 1.15; }
@@ -117,7 +125,6 @@ header { display: grid; gap: 14px; }
   .listcol { grid-column: 1; }
   h1 { font-size: 1.6rem; }
   .sub { font-size: .9375rem; }
-  .summary { grid-template-columns: minmax(0, 1fr); }
 }
 .wx-ico { background: none; border: 0; }
 .wx-pin { display: inline-flex; align-items: center; gap: 2px; padding: 1px 6px 1px 3px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 1px 4px rgba(0,0,0,.25); font: 600 12px/1.4 var(--f-body); color: var(--fg); white-space: nowrap; transform: translate(-50%, -50%); position: absolute; }
@@ -144,8 +151,21 @@ header { display: grid; gap: 14px; }
 
 .list { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
 .list:empty { display: none; }
-.com { padding: 10px 14px 4px; font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; border-top: 1px solid var(--line); }
-.com:first-child { border-top: 0; }
+/* Comarques plegables: plegades mostren la mitjana de temperatura i la previsió més repetida */
+.grp + .grp { border-top: 1px solid var(--line); }
+.grp > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 34px minmax(0, 1fr) auto 20px; gap: 2px 10px; align-items: center; min-height: 56px; padding: 8px 14px; }
+.grp > summary::-webkit-details-marker { display: none; }
+.grp > summary:focus-visible { outline-offset: -3px; }
+.grp > summary .e { font-size: 1.5rem; line-height: 1; text-align: center; }
+.grp > summary .cn { min-width: 0; font-weight: 600; }
+.grp > summary .cn small { display: block; font-weight: 400; color: var(--muted); font-size: .8125rem; }
+.grp > summary .cn .r { color: var(--rain); font-weight: 600; } .grp > summary .cn .s { color: var(--snow); font-weight: 600; }
+.grp > summary .t { font-family: var(--f-display); font-size: 1.25rem; font-variant-numeric: tabular-nums; text-align: right; }
+.grp > summary .t small { display: block; font-family: var(--f-body); font-size: .75rem; color: var(--muted); font-weight: 400; }
+.grp > summary .chev { color: var(--muted); text-align: center; }
+.grp[open] > summary .chev { transform: rotate(180deg); }
+.grp[open] > summary { border-bottom: 1px solid var(--line); }
+@media (hover: hover) { .grp > summary:hover { background: var(--dry); } }
 .row { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 2px 10px; padding: 10px 14px; cursor: pointer; align-items: center; border-left: 3px solid transparent; }
 .row:hover, .row:focus-visible { background: var(--dry); }
 .row:focus-visible { outline-offset: -3px; }
@@ -709,17 +729,32 @@ header { display: grid; gap: 14px; }
   }
 
   function renderList() {
-    let html = "", com = null;
+    const open = new Set([...$("list").querySelectorAll(".grp[open]")].map(d => d.dataset.c)); // es manté obert el que ja ho era
+    const groups = [];
     segs.forEach((s, i) => {
-      const c = s.comarca || (s.cat ? "" : "Fora de Catalunya");
-      if (c !== com) { html += `<div class=com>${esc(c || "—")}</div>`; com = c; }
-      const w = s.w; const [e, t] = look(s);
-      html += `<div class="row ${s.k}" style="border-left-color:${CATS[s.cat || "none"].c}" tabindex=0 role=button data-i=${i}><span class=e aria-hidden=true title="${esc(t)}">${e}</span><span class=n>${esc(s.name || "Buscant el nom…")}<small>km ${fmtKm(s.mid.d)} · hi passes ${fmtClock(s.eta)}</small></span><span class=t>${w ? Math.round(w.temperature_2m) + "°" : "–"}</span><span class=d>${esc(t)} · ${detail(s)}</span></div>`;
+      const c = s.comarca || (s.cat ? "—" : "Fora de Catalunya");
+      if (!groups.length || groups.at(-1).c !== c) groups.push({ c, items: [] });
+      groups.at(-1).items.push(i);
     });
-    $("list").innerHTML = html;
+    $("list").innerHTML = groups.map(g => {
+      const ok = g.items.map(i => segs[i]).filter(s => s.w);
+      const avg = ok.length ? Math.round(ok.reduce((a, s) => a + s.w.temperature_2m, 0) / ok.length) + "°" : "–";
+      const cnt = {}; ok.forEach(s => { const [e, t] = look(s); (cnt[t] ||= { e, t, n: 0 }).n++; });
+      const top = Object.values(cnt).sort((a, b) => b.n - a.n)[0] || { e: "❔", t: "Sense dades" };
+      const wet = ok.filter(s => s.k === "wet").length, snow = ok.filter(s => s.k === "snow").length;
+      const extra = snow ? ` · <span class=s>neu a ${snow}</span>` : wet && top.t.indexOf("luja") < 0 ? ` · <span class=r>pluja a ${wet}</span>` : "";
+      const n = g.items.length;
+      return `<details class=grp data-c="${esc(g.c)}"${open.has(g.c) ? " open" : ""}><summary><span class=e role=img aria-label="${esc(top.t)}">${top.e}</span><span class=cn>${esc(g.c)}<small>${esc(top.t)}${extra} · ${n} ${n === 1 ? "municipi" : "municipis"}</small></span><span class=t>${avg}<small>mitjana</small></span><span class=chev aria-hidden=true>▾</span></summary>`
+        + g.items.map(i => rowHtml(segs[i], i)).join("") + `</details>`;
+    }).join("");
+  }
+  function rowHtml(s, i) {
+      const w = s.w; const [e, t] = look(s);
+      return `<div class="row ${s.k}" style="border-left-color:${CATS[s.cat || "none"].c}" tabindex=0 role=button data-i=${i}><span class=e aria-hidden=true title="${esc(t)}">${e}</span><span class=n>${esc(s.name || "Buscant el nom…")}<small>km ${fmtKm(s.mid.d)} · hi passes ${fmtClock(s.eta)}</small></span><span class=t>${w ? Math.round(w.temperature_2m) + "°" : "–"}</span><span class=d>${esc(t)} · ${detail(s)}</span></div>`;
   }
   function focusRow(i) {
     const el = $("list").querySelector(`[data-i="${i}"]`);
+    const g = el?.closest("details"); if (g) g.open = true;
     if (el && window.matchMedia("(min-width: 901px)").matches) el.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
   function openSeg(i, at) {
@@ -730,34 +765,35 @@ header { display: grid; gap: 14px; }
     if (!window.matchMedia("(min-width: 901px)").matches) $("map").scrollIntoView({ behavior: "smooth", block: "center" });
   }
   $("list").addEventListener("click", e => { const r = e.target.closest(".row"); if (r) openSeg(+r.dataset.i); });
-  $("list").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { if (e.key === " ") e.preventDefault(); const r = e.target.closest(".row"); if (r) openSeg(+r.dataset.i); } });
+  $("list").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { const r = e.target.closest(".row"); if (r) { if (e.key === " ") e.preventDefault(); openSeg(+r.dataset.i); } } });
 
   function renderSummary(r) {
     const ok = segs.filter(s => s.w);
-    const names = (arr) => { const n = arr.map(s => s.name || "…"); return n.length > 4 ? n.slice(0, 4).join(", ") + ` i ${n.length - 4} més` : n.join(", "); };
     const wet = ok.filter(s => s.k === "wet"), snow = ok.filter(s => s.k === "snow");
     const cards = [];
     cards.push(`<div class=card><span class=label>Trajecte</span><div class=verdict>${fmtKm(r.distance)} km · ${fmtDur(r.duration)}</div><div class=facts>${esc(A.name)} → ${esc(B.name)}</div><div class=facts><b>${segs.length}</b> municipis · sortida <b>${fmtClock(r.t0)}</b> · arribada cap a les <b>${fmtClock(r.t0 + r.duration * 1000)}</b></div></div>`);
-    let v, cls, f;
     const fut = ok.some(s => s.w.src === "fc");
-    const verb = fut ? ["Plourà", "Nevarà", "No plourà"] : ["Plou", "Neva", "No plou"];
-    if (snow.length) { v = `${verb[1]} a ${snow.length} de ${ok.length}`; cls = "snow"; f = names(snow); }
-    else if (wet.length) { v = `${verb[0]} a ${wet.length} de ${ok.length} municipis`; cls = "wet"; f = names(wet); }
-    else { v = `${verb[2]} enlloc`; cls = "ok"; f = "Sec a tot el trajecte"; }
     const pmax = ok.reduce((a, b) => (b.w.precipitation_probability || 0) > (a?.w.precipitation_probability || 0) ? b : a, null);
-    if (!wet.length && !snow.length && pmax?.w.precipitation_probability >= 30) f = `Sec, però prob. de pluja del ${Math.round(pmax.w.precipitation_probability)}% a ${pmax.name || "…"}`;
-    if (snow.length && wet.length) f += ` · pluja a ${wet.length} més`;
-    cards.push(`<div class=card><span class=label>${fut ? "Pluja quan hi passis" : "Pluja ara"}</span><div class="verdict ${cls}">${v}</div><div class=facts>${esc(f)}</div></div>`);
+    const minis = [];
+    const mini = (label, e, big, cls, sub) => `<div class=mini><span class=label>${label}</span><div class="big ${cls}"><span class=e aria-hidden=true>${e}</span><span>${big}</span></div>${sub ? `<div class=facts>${sub}</div>` : ""}</div>`;
+    const two = (arr) => { const n = arr.map(s => esc(s.name || "…")); return n.length > 2 ? n.slice(0, 2).join(", ") + ` i ${n.length - 2} més` : n.join(" i "); };
+    if (snow.length) minis.push(mini("Pluja", "❄️", `Neu a ${snow.length} de ${ok.length}`, "snow", two(snow)));
+    else if (wet.length) minis.push(mini("Pluja", "☔", `Pluja a ${wet.length} de ${ok.length}`, "wet", two(wet)));
+    else minis.push(mini("Pluja", "☀️", "Sec", "ok", pmax?.w.precipitation_probability >= 30 ? `prob. ${Math.round(pmax.w.precipitation_probability)}% a ${esc(pmax.name || "…")}` : "a tot el trajecte"));
     if (ok.length) {
       const lo = ok.reduce((a, b) => a.w.temperature_2m <= b.w.temperature_2m ? a : b), hi = ok.reduce((a, b) => a.w.temperature_2m >= b.w.temperature_2m ? a : b);
-      cards.push(`<div class=card><span class=label>Temperatura</span><div class=verdict>${Math.round(lo.w.temperature_2m)}° a ${Math.round(hi.w.temperature_2m)}°</div><div class=facts>Mín. a <b>${esc(lo.name || "…")}</b> · màx. a <b>${esc(hi.name || "…")}</b></div></div>`);
-      const g = ok.reduce((a, b) => a.w.wind_gusts_10m >= b.w.wind_gusts_10m ? a : b);
-      const gusty = ok.filter(s => s.w.wind_gusts_10m >= GUST_STRONG), strong = gusty.length > 0;
-      cards.push(`<div class=card><span class=label>Vent${fut ? " quan hi passis" : ""}</span><div class="verdict ${strong ? "warn" : ""}">${strong ? `💨 Ràfegues fortes a ${gusty.length} de ${ok.length}` : g.w.wind_gusts_10m >= 30 ? "Una mica de vent" : "Poc vent"}</div>${strong ? `<div class=facts>${esc(names(gusty))}</div>` : ""}<div class=facts>Màx. a <b>${esc(g.name || "…")}</b>: ${Math.round(g.w.wind_speed_10m)} km/h, ràfegues de <b>${Math.round(g.w.wind_gusts_10m)} km/h</b></div></div>`);
+      const lt = Math.round(lo.w.temperature_2m), ht = Math.round(hi.w.temperature_2m);
+      minis.push(mini("Temperatura", "🌡️", lt === ht ? `${lt}°` : `${lt}° a ${ht}°`, "", lt === ht ? "a tot el trajecte" : `més fred a ${esc(lo.name || "…")}`));
+      const g = ok.reduce((a, b) => a.w.wind_gusts_10m >= b.w.wind_gusts_10m ? a : b), gg = Math.round(g.w.wind_gusts_10m);
+      const strong = gg >= GUST_STRONG;
+      minis.push(mini("Vent", strong ? "💨" : "🍃", strong ? `Ràfegues de ${gg} km/h` : gg >= 30 ? "Una mica de vent" : "Poc vent", strong ? "warn" : "", strong ? `a ${esc(g.name || "…")}` : `ràfegues fins a ${gg} km/h`));
       const fog = ok.filter(s => [45, 48].includes(s.w.weather_code));
       const sky = ok.filter(s => s.w.cloud_cover < 40).length;
-      cards.push(`<div class=card><span class=label>Cel</span><div class=verdict>${fog.length ? `Boira a ${fog.length} ${fog.length === 1 ? "lloc" : "llocs"}` : sky > ok.length / 2 ? "Majoritàriament serè" : "Majoritàriament ennuvolat"}</div><div class=facts>${fog.length ? esc(names(fog)) : `<b>${sky}</b> de ${ok.length} amb poc núvol`}</div></div>`);
+      minis.push(fog.length ? mini("Cel", "🌫️", `Boira a ${fog.length}`, "", two(fog))
+        : sky > ok.length / 2 ? mini("Cel", "🌤️", "Serè", "", `${sky} de ${ok.length} amb poc núvol`)
+        : mini("Cel", "☁️", "Ennuvolat", "", `${ok.length - sky} de ${ok.length} amb força núvol`));
     }
+    cards.push(`<div class=minis>${minis.join("")}</div>`);
     $("summary").innerHTML = cards.join("");
     const nowN = ok.filter(s => s.w.src !== "fc").length;
     $("mode").innerHTML = !ok.length ? "" : !fut

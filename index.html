@@ -8,6 +8,7 @@
 <meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&display=swap">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
 <style>
 /* Portada mòbil: on ets, el temps d'ara (estació Meteocat si n'hi ha una a prop), botó a la ruta, pròximes hores i 7 dies. */
 :root {
@@ -50,7 +51,8 @@ button, input { font: inherit; color: inherit; }
 .top .where { flex: 1; min-width: 0; }
 .top h1 { font-family: var(--f-display); font-size: 1.6rem; line-height: 1.1; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .top .sub { font-size: .85rem; color: var(--muted); }
-.ibtn { width: 48px; height: 48px; flex: none; border-radius: 12px; border: 1px solid var(--field); background: var(--surface); font-size: 1.15rem; cursor: pointer; display: grid; place-items: center; }
+.ibtn { width: 48px; height: 48px; flex: none; border-radius: 12px; border: 1px solid var(--field); background: var(--surface); color: var(--fg); font-size: 1.15rem; cursor: pointer; display: grid; place-items: center; }
+.ico { width: 22px; height: 22px; display: block; }
 .search { position: relative; }
 .search input { width: 100%; min-height: 48px; padding: 12px 14px; border: 1px solid var(--field); border-radius: 12px; background: var(--surface); }
 .results { position: absolute; z-index: 10; top: calc(100% + 4px); left: 0; right: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,.15); }
@@ -68,10 +70,6 @@ button, input { font: inherit; color: inherit; }
 .now .src { margin-top: 8px; font-size: .8125rem; border-top: 1px solid rgba(255,255,255,.35); padding-top: 8px; }
 .now.loading .temp { opacity: .4; }
 
-.rainmsg { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; display: flex; gap: 12px; align-items: center; font-weight: 500; }
-.rainmsg .e { font-size: 1.6rem; }
-.rainmsg.wet { border-color: var(--rain); }
-.rainmsg.maybe { border-color: var(--warn); }
 
 /* Consens entre models */
 .cons { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; display: grid; gap: 10px; }
@@ -119,6 +117,10 @@ button, input { font: inherit; color: inherit; }
 .h .i { font-size: 1.5rem; line-height: 1.3; }
 .h .v { font-weight: 600; }
 .h .p { font-size: .8125rem; color: var(--rain); font-weight: 600; min-height: 1.1em; }
+/* Canvi de dia: línia vertical i etiqueta «Demà · dimarts 24» damunt de la primera hora */
+.h .dl { justify-self: start; width: 0; margin-left: 6px; min-height: 1.3em; overflow: visible; font-size: .75rem; font-weight: 600; color: var(--muted); white-space: nowrap; position: relative; z-index: 1; }
+.h.newday { border-left: 2px solid var(--accent); }
+.h.newday .dl { color: var(--accent); font-size: .8125rem; }
 .h.newday .t { color: var(--fg); font-weight: 600; }
 .days { display: grid; }
 .h, .d, .hours { position: relative; } /* conté els .sr i evita scroll horitzontal */
@@ -133,6 +135,15 @@ button, input { font: inherit; color: inherit; }
 .bar { position: relative; height: 6px; border-radius: 3px; background: var(--dry); }
 .bar i { position: absolute; top: 0; bottom: 0; border-radius: 3px; background: linear-gradient(90deg, #5aa6d6, #e0a03c); }
 
+/* Radar de pluja */
+.radarcard { display: flex; flex-direction: column; padding-bottom: 12px; }
+.rhead { display: flex; align-items: center; gap: 10px; margin: -6px 12px 8px 16px; }
+.rhead h2 { margin: 0 !important; flex: 1; min-width: 0; }
+.rtime { font-size: .8125rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ibtn.sm { width: 40px; height: 40px; border-radius: 10px; }
+#rmap { height: 280px; margin: 0 12px; border-radius: 10px; background: var(--dry); z-index: 0; }
+#rmap .leaflet-control-attribution { font-size: .75rem; }
+.rmsg { margin: 0 16px; font-size: .85rem; color: var(--muted); }
 .more { display: grid; gap: 8px; }
 .more a { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 13px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; text-decoration: none; color: var(--fg); }
 .more a span { color: var(--muted); font-size: .85rem; text-align: right; }
@@ -149,16 +160,16 @@ button, input { font: inherit; color: inherit; }
     grid-template-areas:
       "top    search"
       "now    days"
-      "rain   days"
       "route  days"
       "myr    days"
+      "radar  days"
       "cons   hours"
       "status status"
       "bottom bottom";
     align-items: start;
   }
   .top { grid-area: top; } .search { grid-area: search; align-self: center; } .now { grid-area: now; }
-  .rainmsg { grid-area: rain; } .bigbtn { grid-area: route; } .myroutes { grid-area: myr; margin-top: 0; }
+  .radarcard { grid-area: radar; } .bigbtn { grid-area: route; } .myroutes { grid-area: myr; margin-top: 0; }
   .cons { grid-area: cons; } .hourscard { grid-area: hours; } .dayscard { grid-area: days; align-self: stretch; }
   .bottom { grid-area: bottom; }
   .more { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
@@ -176,9 +187,9 @@ button, input { font: inherit; color: inherit; }
     grid-template-areas:
       "top    top    search"
       "now    cons   days"
-      "rain   cons   days"
       "route  cons   days"
       "myr    cons   days"
+      "radar  cons   days"
       "hours  hours  hours"
       "bottom bottom bottom";
   }
@@ -188,6 +199,9 @@ button, input { font: inherit; color: inherit; }
   .top { grid-area: top; }
   .status { grid-area: top; justify-self: center; align-self: center; padding: 0 !important; }
   .cons { align-self: stretch; align-content: start; }
+  /* El radar omple l'espai que queda sota el botó de la ruta */
+  .radarcard { align-self: stretch; min-height: 220px; }
+  #rmap { flex: 1; height: auto; min-height: 160px; }
   .top h1 { font-size: 2rem; }
   /* Les 24 hores caben senceres a l'amplada, sense lliscar */
   .hours { overflow-x: visible; padding: 0 12px 4px; }
@@ -204,7 +218,6 @@ button, input { font: inherit; color: inherit; }
   .now { padding: 14px 18px 12px; }
   .now .temp { font-size: 4rem; }
   .now .icon { font-size: 3.2rem; }
-  .rainmsg { padding: 10px 14px; }
   .bigbtn { padding: 12px 16px; }
   .card { padding: 10px 0 6px; }
   .h .i { font-size: 1.3rem; }
@@ -234,8 +247,8 @@ button, input { font: inherit; color: inherit; }
       <h1 id="pname">Buscant on ets…</h1>
       <div class="sub" id="psub">&nbsp;</div>
     </div>
-    <button class="ibtn" id="geo" type="button" title="On soc ara" aria-label="Fes servir la meva ubicació">📍</button>
-    <button class="ibtn" id="find" type="button" title="Canvia de municipi" aria-label="Busca un altre municipi" aria-expanded="false" aria-controls="searchbox">🔍</button>
+    <button class="ibtn" id="geo" type="button" title="On soc ara" aria-label="Fes servir la meva ubicació"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+    <button class="ibtn" id="find" type="button" title="Canvia de municipi" aria-label="Busca un altre municipi" aria-expanded="false" aria-controls="searchbox"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg></button>
   </div>
   <div class="search" id="searchbox" hidden>
     <input id="q" type="search" placeholder="Escriu un municipi (Vic, Olot, Reus…)" autocomplete="off" aria-label="Busca un municipi">
@@ -259,14 +272,21 @@ button, input { font: inherit; color: inherit; }
     <div class="note" id="cnote"></div>
   </section>
 
-  <div class="rainmsg" id="rainmsg" hidden></div>
-
   <a class="bigbtn" id="routebtn" href="ruta.html#desti">
     <span class="e" aria-hidden="true">🗺️</span>
     <span>Mapa de ruta amb el temps<small>On vas? Mira el temps de cada poble del camí</small></span>
     <span class="arr" aria-hidden="true">›</span>
   </a>
   <nav class="myroutes" id="myroutes" aria-label="Les meves rutes"></nav>
+
+  <section class="card radarcard" id="radarcard" aria-labelledby="h-radar">
+    <div class="rhead">
+      <h2 id="h-radar">Radar de pluja</h2>
+      <span class="rtime" id="rtime" aria-live="off"></span>
+      <button class="ibtn sm" id="rplay" type="button" hidden></button>
+    </div>
+    <div id="rmap" role="img" aria-label="Mapa del radar de pluja de les últimes dues hores al voltant del lloc"></div>
+  </section>
 
   <section class="card hourscard" aria-labelledby="h-hours"><h2 id="h-hours">Pròximes hores</h2><div class="hours" id="hours" tabindex="0" role="list" aria-label="Pròximes hores (desplaça horitzontalment)"></div></section>
   <section class="card dayscard" aria-labelledby="h-days"><h2 id="h-days">Pròxims 7 dies</h2><div class="days" id="days" role="list"></div></section>
@@ -282,6 +302,7 @@ button, input { font: inherit; color: inherit; }
   </footer>
 </main>
 
+<script src="vendor/leaflet/leaflet.js"></script>
 <script src="ui.js" defer></script>
 <script>
 (() => {
@@ -435,31 +456,8 @@ button, input { font: inherit; color: inherit; }
       ? `🌡️ Mesurat a les ${clock(obs.at)} a l'estació Meteocat de <b>${esc(obs.st.name)}</b> (${obs.st.km < 1 ? "a tocar" : `a ${fmt1(obs.st.km)} km`})${obs.hum != null ? ` · humitat ${Math.round(obs.hum)}%` : ""}${obs.rain > 0 ? ` · ${fmt1(obs.rain)} mm l'última hora` : ""}`
       : `Sense estació del Meteocat a prop: temperatura del model (Open-Meteo) · humitat ${Math.round(c.relative_humidity_2m)}%`;
     $("now").classList.remove("loading");
-    renderRain(f);
     renderHours(f, t);
     renderDays(f);
-  }
-  function renderRain(f) {
-    const h = f.hourly, now = Date.now();
-    const idx = h.time.map((t, i) => i).filter(i => new Date(h.time[i] + ":00").getTime() > now - 3600e3).slice(0, 12);
-    const wet = idx.find(i => (h.precipitation_probability[i] ?? 0) >= 50 || (h.precipitation[i] ?? 0) >= 0.3);
-    const maxP = Math.max(0, ...idx.map(i => h.precipitation_probability[i] ?? 0));
-    const box = $("rainmsg");
-    let e, txt, cls;
-    if (wet != null) {
-      const hr = +h.time[wet].slice(11, 13);
-      const snow = isSnow(h.weather_code[wet]);
-      const first = wet === idx[0];
-      e = snow ? "❄️" : "☔"; cls = "wet";
-      txt = first ? `${snow ? "Neu" : "Pluja"} ara o d'aquí poc. Agafa el paraigua.` : `${snow ? "Neu" : "Pluja"} probable cap a les ${hr} h. Agafa el paraigua.`;
-    } else if (maxP >= 25) {
-      e = "🌂"; cls = "maybe"; txt = `Pot caure algun ruixat les pròximes 12 hores (fins a un ${maxP}%).`;
-    } else {
-      e = "👍"; cls = ""; txt = "No es preveu pluja les pròximes 12 hores.";
-    }
-    box.className = "rainmsg " + cls;
-    box.innerHTML = `<span class=e aria-hidden=true>${e}</span><span>${txt}</span>`;
-    box.hidden = false;
   }
   function renderHours(f, nowT) {
     const h = f.hourly, now = Date.now();
@@ -469,9 +467,10 @@ button, input { font: inherit; color: inherit; }
       if (ts < now - 3600e3) continue;
       const hr = +h.time[i].slice(11, 13), day = h.time[i].slice(0, 10);
       const newDay = prevDay && day !== prevDay; prevDay = day;
+      const dl = n === 0 ? "Avui" : newDay ? "Demà · " + new Date(day + "T12:00").toLocaleDateString("ca-ES", { weekday: "long", day: "numeric" }) : "";
       const p = h.precipitation_probability[i];
       const [hi, hd] = wx(h.weather_code[i], h.is_day[i]);
-      out += `<div class="h${newDay ? " newday" : ""}" role=listitem><span class=t>${n === 0 ? "Ara" : newDay ? "Demà" : hr + " h"}</span><span class=i role=img aria-label="${hd}">${hi}</span><span class=v>${deg(n === 0 && nowT != null ? nowT : h.temperature_2m[i])}</span><span class=p>${p >= 10 ? p + "%<span class=sr> de pluja</span>" : ""}</span></div>`;
+      out += `<div class="h${newDay ? " newday" : ""}" role=listitem><span class=dl>${dl}</span><span class=t>${n === 0 ? "Ara" : hr + " h"}</span><span class=i role=img aria-label="${hd}">${hi}</span><span class=v>${deg(n === 0 && nowT != null ? nowT : h.temperature_2m[i])}</span><span class=p>${p >= 10 ? p + "%<span class=sr> de pluja</span>" : ""}</span></div>`;
       n++;
     }
     $("hours").innerHTML = out;
@@ -586,6 +585,7 @@ button, input { font: inherit; color: inherit; }
     loc = l; store.set("bmc.home.loc", l);
     store.set("bmc.loc", { name: l.name, lat: l.lat, lon: l.lon }); // el comparador obre el mateix lloc
     renderPlace(l);
+    radarTo(l);
     setStatus("Actualitzant…");
     if (!cmodels || cmodels.loc !== `${l.lat},${l.lon}`) { cmodels = null; $("cons").hidden = true; }
     loadCons(l, my).then(() => { if (cmodels) cmodels.loc = `${l.lat},${l.lon}`; });
@@ -616,11 +616,67 @@ button, input { font: inherit; color: inherit; }
       load({ ...n, lat, lon, here: true });
     }, () => {
       if (manual || !loc) {
-        setStatus("No sé on ets. Dona permís d'ubicació al navegador o busca el municipi amb 🔍.", true);
+        setStatus("No sé on ets. Dona permís d'ubicació al navegador o busca el municipi amb la lupa.", true);
         if (!loc) { toggleSearch(true, false); load({ name: "Barcelona", sub: "Barcelonès", lat: 41.3874, lon: 2.1686 }); }
       }
     }, { timeout: 12000, maximumAge: 5 * 60e3, enableHighAccuracy: false });
   }
+
+  // ---------- Radar de pluja (RainViewer), animat al voltant del lloc ----------
+  const PLAY = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M8 5.5v13l10.5-6.5z"/></svg>';
+  const PAUSE = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><rect x="6.5" y="5" width="4" height="14" rx="1"/><rect x="13.5" y="5" width="4" height="14" rx="1"/></svg>';
+  const radar = { map: null, dot: null, layers: [], frames: [], cur: 0, timer: null, want: !matchMedia("(prefers-reduced-motion: reduce)").matches };
+  function radarInit(l) {
+    if (!window.L) { $("rmap").outerHTML = "<p class=rmsg>No s'ha pogut carregar el mapa del radar.</p>"; return; }
+    const m = radar.map = L.map("rmap", { zoomControl: true, attributionControl: true, dragging: false, scrollWheelZoom: false, touchZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false }).setView([l.lat, l.lon], 8);
+    m.attributionControl.setPrefix(false);
+    const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap · radar © RainViewer" });
+    let ok = 0, bad = 0, switched = false;
+    osm.on("tileload", () => ok++);
+    osm.on("tileerror", () => {
+      if (switched || ++bad < 4 || ok) return;
+      switched = true; m.removeLayer(osm);
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", { maxZoom: 18, attribution: "© OpenStreetMap, © CARTO · radar © RainViewer" }).addTo(m);
+    });
+    osm.addTo(m);
+    radar.dot = L.circleMarker([l.lat, l.lon], { radius: 7, color: "#c0392b", weight: 3, fillOpacity: .35 }).addTo(m);
+    if (window.ResizeObserver) new ResizeObserver(() => m.invalidateSize()).observe($("rmap"));
+    radarLoad();
+    setInterval(radarLoad, 10 * 60e3);
+    document.addEventListener("visibilitychange", radarAuto);
+  }
+  function radarTo(l) {
+    if (!radar.map) { radarInit(l); return; }
+    radar.map.setView([l.lat, l.lon], radar.map.getZoom()); radar.dot.setLatLng([l.lat, l.lon]);
+  }
+  async function radarLoad() {
+    try {
+      const j = await getJSON("https://api.rainviewer.com/public/weather-maps.json");
+      radar.layers.forEach(x => radar.map.removeLayer(x));
+      radar.frames = [...(j.radar?.past || []), ...(j.radar?.nowcast || [])];
+      radar.layers = radar.frames.map(f => L.tileLayer(`${j.host}${f.path}/256/{z}/{x}/{y}/2/1_1.png`, { opacity: 0, maxNativeZoom: 7, maxZoom: 12, zIndex: 5 }).addTo(radar.map));
+      radarShow(radar.frames.length - 1 - (j.radar?.nowcast?.length || 0));
+      $("rplay").hidden = radar.frames.length < 2;
+      radarAuto();
+    } catch { $("rtime").textContent = "Radar no disponible"; $("rplay").hidden = true; }
+  }
+  function radarShow(i) {
+    const n = radar.frames.length; if (!n) return;
+    radar.cur = (i + n) % n;
+    radar.layers.forEach((x, k) => x.setOpacity(k === radar.cur ? 0.75 : 0));
+    const ms = radar.frames[radar.cur].time * 1000;
+    $("rtime").textContent = clock(new Date(ms)) + (ms > Date.now() ? " (previsió)" : "");
+  }
+  // Animació: només si l'usuari no demana menys moviment, i aturada quan la pestanya no es veu.
+  function radarAuto() {
+    const run = radar.want && !document.hidden && radar.frames.length > 1;
+    if (run && !radar.timer) radar.timer = setInterval(() => radarShow(radar.cur + 1), 700);
+    if (!run && radar.timer) { clearInterval(radar.timer); radar.timer = null; }
+    $("rplay").innerHTML = radar.want ? PAUSE : PLAY;
+    $("rplay").setAttribute("aria-label", radar.want ? "Atura l'animació del radar" : "Anima el radar");
+    $("rplay").title = radar.want ? "Atura" : "Anima";
+  }
+  $("rplay").addEventListener("click", () => { radar.want = !radar.want; radarAuto(); });
 
   // Rutes guardades a la pàgina de ruta
   const myr = store.get("bmc.routes") || [];
