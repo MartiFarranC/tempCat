@@ -36,6 +36,7 @@ Còpies de cada pàgina per revisar-ne el disseny: `revisio/index.html`, `revisi
 - Es guarden al navegador (`localStorage`, clau `tempcat.revisio`), amb la pàgina, el selector CSS, el text de l'element, la secció i l'amplada de la vista.
 - **🗒️ Comentaris** els llista i els exporta (de totes les pàgines) en Markdown o JSON per passar-los a Claude.
 - Codi: `revisio/revisio.js` i `revisio/revisio.css`. Proves: `node tests/revisio.test.mjs`.
+- Per muntar-lo en un altre projecte: [`docs/sistema-revisio-comentaris.md`](docs/sistema-revisio-comentaris.md).
 
 ## Disseny
 
