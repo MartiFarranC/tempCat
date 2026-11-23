@@ -29,6 +29,14 @@ Les rutes es poden guardar (⭐, en el `localStorage` del navegador, clau `bmc.r
 - Línia del recorregut: un color per a cada tipus de previsió (sol, mig ennuvolat, cobert, boira, pluja, pluja forta, tempesta, neu) a l'hora de pas, amb degradat de 1,2 km a cada costat dels canvis. Les icones de temps al mapa només surten si es marca la casella (es recorda al navegador).
 - Ràfegues: els trams amb ràfegues de 50 km/h o més tenen una vora discontínua taronja (vermella a partir de 70 km/h).
 
+## Revisió amb comentaris (`revisio/`)
+
+Còpies de cada pàgina per revisar-ne el disseny: `revisio/index.html`, `revisio/ruta.html` i `revisio/comparador.html`. Mostren l'original tal qual (dins d'un iframe, sense duplicar-ne el codi) i hi afegeixen una barra amb **💬 Comentar**: amb el mode actiu, tocar (o prémer Enter sobre) qualsevol element obre un camp per comentar-lo; «Tot el contenidor ↑» amplia la selecció a l'element pare. Cada comentari queda marcat amb un número sobre l'element.
+
+- Es guarden al navegador (`localStorage`, clau `tempcat.revisio`), amb la pàgina, el selector CSS, el text de l'element, la secció i l'amplada de la vista.
+- **🗒️ Comentaris** els llista i els exporta (de totes les pàgines) en Markdown o JSON per passar-los a Claude.
+- Codi: `revisio/revisio.js` i `revisio/revisio.css`. Proves: `node tests/revisio.test.mjs`.
+
 ## Disseny
 
 Les pàgines segueixen la guia d'interfície de [`docs/guia-disseny.md`](docs/guia-disseny.md) (contrast, mides de toc, teclat, moviment reduït). Les normes concretes del projecte són a [`CLAUDE.md`](CLAUDE.md).

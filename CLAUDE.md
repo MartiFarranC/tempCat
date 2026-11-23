@@ -3,6 +3,7 @@
 - Web estàtica (HTML + CSS + JS dins de cada pàgina, sense build), publicada a GitHub Pages des de `main`.
 - Pàgines: `index.html` (portada mòbil), `ruta.html` (ruta amb el temps), `comparador.html` (comparador de models).
   `ui.js` té el comportament compartit (teclat als cercadors).
+- `revisio/` té còpies per comentar cada pàgina: carreguen l'original en un iframe, així que no cal tocar-les quan canvia una pàgina. Si se n'afegeix una de nova, crea `revisio/<nom>.html` (copia'n una) i afegeix-la a `PAGES` de `revisio/revisio.js`. Proves: `node tests/revisio.test.mjs`.
 - Textos de la interfície en català.
 
 ## Disseny d'interfície
