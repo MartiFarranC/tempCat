@@ -28,3 +28,7 @@ Les rutes es poden guardar (⭐, en el `localStorage` del navegador, clau `bmc.r
 - Ruta: si `router.project-osrm.org` falla o triga més de 15 s, es prova `routing.openstreetmap.de`.
 - Línia del recorregut: un color per a cada tipus de previsió (sol, mig ennuvolat, cobert, boira, pluja, pluja forta, tempesta, neu) a l'hora de pas, amb degradat de 1,2 km a cada costat dels canvis. Les icones de temps al mapa només surten si es marca la casella (es recorda al navegador).
 - Ràfegues: els trams amb ràfegues de 50 km/h o més tenen una vora discontínua taronja (vermella a partir de 70 km/h).
+
+## Disseny
+
+Les pàgines segueixen la guia d'interfície de [`docs/guia-disseny.md`](docs/guia-disseny.md) (contrast, mides de toc, teclat, moviment reduït). Les normes concretes del projecte són a [`CLAUDE.md`](CLAUDE.md).

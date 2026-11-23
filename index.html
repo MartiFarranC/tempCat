@@ -4,32 +4,34 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>El temps aquí</title>
-<meta name="theme-color" content="#1f6fa8">
+<meta name="theme-color" content="#1f6fa8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f171d" media="(prefers-color-scheme: dark)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600;700&display=swap">
 <style>
 /* Portada mòbil: on ets, el temps d'ara (estació Meteocat si n'hi ha una a prop), botó a la ruta, pròximes hores i 7 dies. */
 :root {
-  --bg: #f3f6f8; --surface: #ffffff; --fg: #16232d; --muted: #5b6b77; --line: #d6dee4;
+  --bg: #f3f6f8; --surface: #ffffff; --fg: #16232d; --muted: #5b6b77; --line: #d6dee4; --field: #7d8b96;
   --accent: #1f6fa8; --accent-fg: #ffffff; --rain: #1f6fa8; --warn: #b5541c; --ok: #2d7a4b; --dry: #eef2f4;
-  --hero1: #2a7fbf; --hero2: #1b5f91;
+  --hero1: #226ea8; --hero2: #1b5f91;
   --f-display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
   --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0f171d; --surface: #16212a; --fg: #e3ebf0; --muted: #91a2ae; --line: #2a3943;
+    --bg: #0f171d; --surface: #16212a; --fg: #e3ebf0; --muted: #91a2ae; --line: #2a3943; --field: #5f7380;
     --accent: #6bb3e6; --accent-fg: #0f171d; --rain: #6bb3e6; --warn: #e8935f; --ok: #6cc28f; --dry: #1b2832;
     --hero1: #1d4a6c; --hero2: #14334b; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --bg: #0f171d; --surface: #16212a; --fg: #e3ebf0; --muted: #91a2ae; --line: #2a3943;
+  --bg: #0f171d; --surface: #16212a; --fg: #e3ebf0; --muted: #91a2ae; --line: #2a3943; --field: #5f7380;
   --accent: #6bb3e6; --accent-fg: #0f171d; --rain: #6bb3e6; --warn: #e8935f; --ok: #6cc28f; --dry: #1b2832;
   --hero1: #1d4a6c; --hero2: #14334b; color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; } /* que cap display de classe torni a mostrar un bloc amagat */
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.45 var(--f-body);
@@ -39,7 +41,8 @@ body {
 .wrap > * { min-width: 0; }
 a { color: var(--accent); }
 button, input { font: inherit; color: inherit; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .muted { color: var(--muted); }
 
 /* Lloc */
@@ -47,11 +50,11 @@ button, input { font: inherit; color: inherit; }
 .top .where { flex: 1; min-width: 0; }
 .top h1 { font-family: var(--f-display); font-size: 1.6rem; line-height: 1.1; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .top .sub { font-size: .85rem; color: var(--muted); }
-.ibtn { width: 44px; height: 44px; flex: none; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); font-size: 1.15rem; cursor: pointer; display: grid; place-items: center; }
+.ibtn { width: 48px; height: 48px; flex: none; border-radius: 12px; border: 1px solid var(--field); background: var(--surface); font-size: 1.15rem; cursor: pointer; display: grid; place-items: center; }
 .search { position: relative; }
-.search input { width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.search input { width: 100%; min-height: 48px; padding: 12px 14px; border: 1px solid var(--field); border-radius: 12px; background: var(--surface); }
 .results { position: absolute; z-index: 10; top: calc(100% + 4px); left: 0; right: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,.15); }
-.results button { display: block; width: 100%; text-align: left; padding: 12px 14px; border: 0; background: none; cursor: pointer; }
+.results button { display: block; width: 100%; min-height: 48px; text-align: left; padding: 12px 14px; border: 0; background: none; cursor: pointer; }
 .results button + button { border-top: 1px solid var(--line); }
 .results small { color: var(--muted); }
 
@@ -61,8 +64,8 @@ button, input { font: inherit; color: inherit; }
 .now .temp { font-family: var(--f-display); font-size: 5rem; line-height: 1; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .now .icon { font-size: 4rem; line-height: 1; }
 .now .desc { font-size: 1.3rem; font-weight: 600; }
-.now .feel { opacity: .9; font-size: .95rem; }
-.now .src { margin-top: 8px; font-size: .78rem; opacity: .85; border-top: 1px solid rgba(255,255,255,.25); padding-top: 8px; }
+.now .feel { font-size: 1rem; }
+.now .src { margin-top: 8px; font-size: .8125rem; border-top: 1px solid rgba(255,255,255,.35); padding-top: 8px; }
 .now.loading .temp { opacity: .4; }
 
 .rainmsg { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; display: flex; gap: 12px; align-items: center; font-weight: 500; }
@@ -73,22 +76,22 @@ button, input { font: inherit; color: inherit; }
 /* Consens entre models */
 .cons { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; display: grid; gap: 10px; }
 .cons .head { flex-wrap: wrap; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.cons h2 { font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0; font-weight: 600; }
+.cons h2 { font-size: .8125rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0; font-weight: 600; }
 .tabs { display: flex; gap: 4px; background: var(--dry); border-radius: 10px; padding: 3px; }
-.tabs button { white-space: nowrap; border: 0; background: none; padding: 5px 9px; border-radius: 8px; font-size: .8rem; cursor: pointer; color: var(--muted); }
+.tabs button { white-space: nowrap; border: 0; background: none; min-height: 40px; padding: 6px 14px; border-radius: 8px; font-size: .875rem; cursor: pointer; color: var(--muted); }
 .tabs button[aria-pressed="true"] { background: var(--surface); color: var(--fg); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
 .cbar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; gap: 2px; }
 .cbar i { display: block; height: 100%; }
 .cverdict { font-weight: 600; font-size: 1.05rem; }
 .clist { display: grid; gap: 6px; }
 .clist details { border-radius: 10px; }
-.clist summary { display: grid; grid-template-columns: 1.6em minmax(0, 1fr) auto; gap: 8px; align-items: center; cursor: pointer; list-style: none; font-variant-numeric: tabular-nums; }
+.clist summary { min-height: 44px; padding: 0 6px; margin: 0 -6px; border-radius: 8px; display: grid; grid-template-columns: 1.6em minmax(0, 1fr) auto; gap: 8px; align-items: center; cursor: pointer; list-style: none; font-variant-numeric: tabular-nums; }
 .clist summary::-webkit-details-marker { display: none; }
 .clist summary .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: middle; }
 .clist summary b { font-weight: 600; }
 .clist summary .pc { color: var(--muted); font-size: .9rem; }
 .clist .who { font-size: .82rem; color: var(--muted); padding: 4px 0 2px 2.2em; }
-.cons .note { font-size: .78rem; color: var(--muted); }
+.cons .note { font-size: .8125rem; color: var(--muted); }
 
 /* Botó ruta */
 .bigbtn { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 16px; background: var(--accent); color: var(--accent-fg); text-decoration: none; font-weight: 600; font-size: 1.1rem; box-shadow: 0 4px 14px rgba(31,111,168,.25); }
@@ -102,14 +105,20 @@ button, input { font: inherit; color: inherit; }
 
 /* Hores i dies */
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 14px 0 10px; }
-.card h2 { font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 16px 8px; font-weight: 600; }
+.card h2 { font-size: .8125rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 16px 8px; font-weight: 600; }
 .hours { display: flex; overflow-x: auto; scroll-snap-type: x proximity; padding: 0 8px 6px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
 .hours::-webkit-scrollbar { display: none; }
+/* Amb ratolí no hi ha lliscament: es mostra una barra fina per poder desplaçar-se (§15.2). */
+@media (hover: hover) and (pointer: fine) {
+  .hours { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  .hours::-webkit-scrollbar { display: block; height: 8px; }
+  .hours::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+}
 .h { flex: none; width: 58px; display: grid; justify-items: center; gap: 2px; scroll-snap-align: start; font-variant-numeric: tabular-nums; }
 .h .t { font-size: .8rem; color: var(--muted); }
 .h .i { font-size: 1.5rem; line-height: 1.3; }
 .h .v { font-weight: 600; }
-.h .p { font-size: .75rem; color: var(--rain); font-weight: 600; min-height: 1.1em; }
+.h .p { font-size: .8125rem; color: var(--rain); font-weight: 600; min-height: 1.1em; }
 .h.newday .t { color: var(--fg); font-weight: 600; }
 .days { display: grid; }
 .d { display: grid; grid-template-columns: 5.4em 2em 3.2em minmax(0, 1fr); align-items: center; gap: 8px; padding: 9px 16px; font-variant-numeric: tabular-nums; }
@@ -128,8 +137,23 @@ button, input { font: inherit; color: inherit; }
 .more a span { color: var(--muted); font-size: .85rem; text-align: right; }
 .status { font-size: .85rem; color: var(--muted); text-align: center; min-height: 1.2em; }
 .status.err { color: var(--warn); }
-.foot { font-size: .75rem; color: var(--muted); text-align: center; }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+.foot { font-size: .8125rem; line-height: 1.5; color: var(--muted); text-align: center; }
+/* Estats: hover només amb ratolí; pressió visible a l'instant (§3.4, §23.1). */
+@media (hover: hover) {
+  .ibtn:hover, .myroutes a:hover, .more a:hover { border-color: var(--accent); }
+  .clist summary:hover { background: var(--dry); }
+  .results button:hover { background: var(--dry); }
+  .tabs button:hover:not([aria-pressed="true"]) { color: var(--fg); }
+  .bigbtn:hover { filter: brightness(1.08); }
+}
+.results button:focus-visible { background: var(--dry); outline-offset: -3px; }
+.ibtn[aria-expanded="true"] { border-color: var(--accent); background: var(--dry); }
+/* Moviment opcional: només si l'usuari no demana menys moviment (§14.9). */
+@media (prefers-reduced-motion: no-preference) {
+  .ibtn, .bigbtn, .myroutes a, .more a { transition: transform 100ms ease-out, filter 150ms ease-out, border-color 150ms ease-out; }
+  .ibtn:active, .bigbtn:active, .myroutes a:active, .more a:active { transform: scale(.97); }
+  .now .temp { transition: opacity 200ms ease-out; }
+}
 </style>
 </head>
 <body>
@@ -140,7 +164,7 @@ button, input { font: inherit; color: inherit; }
       <div class="sub" id="psub">&nbsp;</div>
     </div>
     <button class="ibtn" id="geo" type="button" title="On soc ara" aria-label="Fes servir la meva ubicació">📍</button>
-    <button class="ibtn" id="find" type="button" title="Canvia de municipi" aria-label="Busca un altre municipi">🔍</button>
+    <button class="ibtn" id="find" type="button" title="Canvia de municipi" aria-label="Busca un altre municipi" aria-expanded="false" aria-controls="searchbox">🔍</button>
   </div>
   <div class="search" id="searchbox" hidden>
     <input id="q" type="search" placeholder="Escriu un municipi (Vic, Olot, Reus…)" autocomplete="off" aria-label="Busca un municipi">
@@ -148,7 +172,7 @@ button, input { font: inherit; color: inherit; }
   </div>
 
   <section class="now loading" id="now" aria-live="polite">
-    <div class="row1"><div class="temp" id="temp">--°</div><div class="icon" id="icon">⏳</div></div>
+    <div class="row1"><div class="temp" id="temp">--°</div><div class="icon" id="icon" aria-hidden="true">⏳</div></div>
     <div class="desc" id="desc">Carregant…</div>
     <div class="feel" id="feel"></div>
     <div class="src" id="src"></div>
@@ -156,7 +180,7 @@ button, input { font: inherit; color: inherit; }
 
   <section class="cons" id="cons" hidden>
     <div class="head"><h2>Què diuen els models</h2>
-      <div class="tabs" id="ctabs"><button type="button" data-w="now" aria-pressed="true">Ara</button><button type="button" data-w="today" aria-pressed="false">Avui</button><button type="button" data-w="tom" aria-pressed="false">Demà</button></div>
+      <div class="tabs" id="ctabs" role="group" aria-label="Franja de temps"><button type="button" data-w="now" aria-pressed="true">Ara</button><button type="button" data-w="today" aria-pressed="false">Avui</button><button type="button" data-w="tom" aria-pressed="false">Demà</button></div>
     </div>
     <div class="cverdict" id="cverdict"></div>
     <div class="cbar" id="cbar" aria-hidden="true"></div>
@@ -167,24 +191,25 @@ button, input { font: inherit; color: inherit; }
   <div class="rainmsg" id="rainmsg" hidden></div>
 
   <a class="bigbtn" id="routebtn" href="ruta.html#desti">
-    <span class="e">🗺️</span>
+    <span class="e" aria-hidden="true">🗺️</span>
     <span>Mapa de ruta amb el temps<small>On vas? Mira el temps de cada poble del camí</small></span>
-    <span class="arr">›</span>
+    <span class="arr" aria-hidden="true">›</span>
   </a>
   <nav class="myroutes" id="myroutes" aria-label="Les meves rutes"></nav>
 
-  <section class="card"><h2>Pròximes hores</h2><div class="hours" id="hours"></div></section>
-  <section class="card"><h2>Pròxims 7 dies</h2><div class="days" id="days"></div></section>
+  <section class="card" aria-labelledby="h-hours"><h2 id="h-hours">Pròximes hores</h2><div class="hours" id="hours" tabindex="0" role="list" aria-label="Pròximes hores (desplaça horitzontalment)"></div></section>
+  <section class="card" aria-labelledby="h-days"><h2 id="h-days">Pròxims 7 dies</h2><div class="days" id="days" role="list"></div></section>
 
-  <div class="status" id="status"></div>
+  <div class="status" id="status" role="status"></div>
 
-  <nav class="more">
-    <a id="meteocat" href="https://www.meteo.cat/prediccio/municipal" target="_blank" rel="noopener">Previsió oficial del Meteocat<span>meteo.cat ↗</span></a>
+  <nav class="more" aria-label="Més eines">
+    <a id="meteocat" href="https://www.meteo.cat/prediccio/municipal" target="_blank" rel="noopener">Previsió oficial del Meteocat<span>meteo.cat ↗<span class="sr"> (s'obre en una pestanya nova)</span></span></a>
     <a href="comparador.html">Comparador de models de pluja<span>avançat</span></a>
   </nav>
   <p class="foot">Temperatura i humitat: estacions XEMA del Meteocat (dades obertes). Estat del cel i previsió: Open-Meteo (millor model per a cada zona). «Què diuen els models»: 10 models de Météo-France, ECMWF, DWD, Met Office, NOAA, KNMI i Canadà via Open-Meteo (Meteocat i AEMET no publiquen les dades per model).</p>
 </main>
 
+<script src="ui.js" defer></script>
 <script>
 (() => {
   const TZ = "Europe/Madrid";
@@ -360,7 +385,7 @@ button, input { font: inherit; color: inherit; }
       e = "👍"; cls = ""; txt = "No es preveu pluja les pròximes 12 hores.";
     }
     box.className = "rainmsg " + cls;
-    box.innerHTML = `<span class=e>${e}</span><span>${txt}</span>`;
+    box.innerHTML = `<span class=e aria-hidden=true>${e}</span><span>${txt}</span>`;
     box.hidden = false;
   }
   function renderHours(f, nowT) {
@@ -372,7 +397,8 @@ button, input { font: inherit; color: inherit; }
       const hr = +h.time[i].slice(11, 13), day = h.time[i].slice(0, 10);
       const newDay = prevDay && day !== prevDay; prevDay = day;
       const p = h.precipitation_probability[i];
-      out += `<div class="h${newDay ? " newday" : ""}"><span class=t>${n === 0 ? "Ara" : newDay ? "Demà" : hr + " h"}</span><span class=i>${wx(h.weather_code[i], h.is_day[i])[0]}</span><span class=v>${deg(n === 0 && nowT != null ? nowT : h.temperature_2m[i])}</span><span class=p>${p >= 10 ? p + "%" : ""}</span></div>`;
+      const [hi, hd] = wx(h.weather_code[i], h.is_day[i]);
+      out += `<div class="h${newDay ? " newday" : ""}" role=listitem><span class=t>${n === 0 ? "Ara" : newDay ? "Demà" : hr + " h"}</span><span class=i role=img aria-label="${hd}">${hi}</span><span class=v>${deg(n === 0 && nowT != null ? nowT : h.temperature_2m[i])}</span><span class=p>${p >= 10 ? p + "%<span class=sr> de pluja</span>" : ""}</span></div>`;
       n++;
     }
     $("hours").innerHTML = out;
@@ -384,8 +410,9 @@ button, input { font: inherit; color: inherit; }
       const name = i === 0 ? "Avui" : i === 1 ? "Demà" : new Date(t + "T12:00:00Z").toLocaleDateString("ca-ES", { weekday: "short", day: "numeric", timeZone: "UTC" });
       const p = d.precipitation_probability_max[i];
       const a = (d.temperature_2m_min[i] - lo) / span * 100, b = (d.temperature_2m_max[i] - lo) / span * 100;
-      return `<div class=d><span class=n>${name}</span><span class=i title="${wx(d.weather_code[i], 1)[1]}">${wx(d.weather_code[i], 1)[0]}</span><span class=p>${p >= 10 ? "💧" + p + "%" : ""}</span>
-        <span class=range><span class=lo>${deg(d.temperature_2m_min[i])}</span><span class=bar><i style="left:${a.toFixed(0)}%;right:${(100 - b).toFixed(0)}%"></i></span><span class=hi>${deg(d.temperature_2m_max[i])}</span></span></div>`;
+      const [di, dd] = wx(d.weather_code[i], 1);
+      return `<div class=d role=listitem><span class=n>${name}</span><span class=i role=img aria-label="${dd}" title="${dd}">${di}</span><span class=p>${p >= 10 ? "<span aria-hidden=true>💧</span>" + p + "%<span class=sr> de pluja</span>" : ""}</span>
+        <span class=range><span class=lo><span class=sr>mínima </span>${deg(d.temperature_2m_min[i])}</span><span class=bar aria-hidden=true><i style="left:${a.toFixed(0)}%;right:${(100 - b).toFixed(0)}%"></i></span><span class=hi><span class=sr>màxima </span>${deg(d.temperature_2m_max[i])}</span></span></div>`;
     }).join("");
   }
 
@@ -464,7 +491,7 @@ button, input { font: inherit; color: inherit; }
       : top.who.length === n ? `Tots ${n} coincideixen: ${top.t.toLowerCase()} ${lbl}.`
       : `${top.who.length} de ${n} diuen ${top.t.toLowerCase()} ${lbl}${wet && top.k !== "rain" && top.k !== "storm" && top.k !== "snow" ? `, però ${wet} veuen precipitació` : ""}.`;
     $("cbar").innerHTML = groups.map(g => `<i style="flex:${g.who.length};background:${g.c}" title="${g.t}: ${g.who.length}"></i>`).join("");
-    $("clist").innerHTML = groups.map(g => `<details><summary><span>${g.e}</span><span><span class=dot style="background:${g.c}"></span><b>${g.t}</b></span><span class=pc>${pct(g.who.length)}% · ${g.who.length} de ${n}</span></summary>
+    $("clist").innerHTML = groups.map(g => `<details><summary><span aria-hidden=true>${g.e}</span><span><span class=dot aria-hidden=true style="background:${g.c}"></span><b>${g.t}</b></span><span class=pc>${pct(g.who.length)}% · ${g.who.length} de ${n}</span></summary>
       <div class=who>${g.who.map(v => esc(v.name) + (v.mm >= 0.1 ? ` (${fmt1(v.mm)} mm)` : "")).join(" · ")}</div></details>`).join("");
     const tx = votes.map(v => v.tmax).filter(v => v != null), tn = votes.map(v => v.tmin).filter(v => v != null);
     $("cnote").textContent = (cwin === "now" ? (tn.length ? `Temperatura segons els models: entre ${deg(Math.min(...tn))} i ${deg(Math.max(...tx))}. ` : "") : (tx.length ? `Màxima segons els models: entre ${deg(Math.min(...tx))} i ${deg(Math.max(...tx))}. ` : "")) + "Toca una línia per veure quins models ho diuen.";
@@ -517,14 +544,14 @@ button, input { font: inherit; color: inherit; }
     }, () => {
       if (manual || !loc) {
         setStatus("No sé on ets. Dona permís d'ubicació al navegador o busca el municipi amb 🔍.", true);
-        if (!loc) { $("searchbox").hidden = false; load({ name: "Barcelona", sub: "Barcelonès", lat: 41.3874, lon: 2.1686 }); }
+        if (!loc) { toggleSearch(true, false); load({ name: "Barcelona", sub: "Barcelonès", lat: 41.3874, lon: 2.1686 }); }
       }
     }, { timeout: 12000, maximumAge: 5 * 60e3, enableHighAccuracy: false });
   }
 
   // Rutes guardades a la pàgina de ruta
   const myr = store.get("bmc.routes") || [];
-  $("myroutes").innerHTML = myr.map(r => `<a href="ruta.html?r=${encodeURIComponent(r.id)}"><span>⭐</span><span>${String(r.name).replace(/[&<>"']/g, c => "&#" + c.charCodeAt(0) + ";")}</span><span class=arr>›</span></a>`).join("");
+  $("myroutes").innerHTML = myr.map(r => `<a href="ruta.html?r=${encodeURIComponent(r.id)}"><span aria-hidden=true>⭐</span><span>${esc(r.name)}</span><span class=arr aria-hidden=true>›</span></a>`).join("");
 
   // Ruta: surt d'on ets ara
   $("routebtn").addEventListener("click", () => {
@@ -533,7 +560,13 @@ button, input { font: inherit; color: inherit; }
 
   // Cerca
   $("geo").addEventListener("click", () => locate(true));
-  $("find").addEventListener("click", () => { const b = $("searchbox"); b.hidden = !b.hidden; if (!b.hidden) $("q").focus(); });
+  function toggleSearch(open, focus = true) {
+    const b = $("searchbox"); b.hidden = !open; $("find").setAttribute("aria-expanded", String(open));
+    if (open && focus) $("q").focus(); else { $("results").hidden = true; }
+  }
+  $("find").addEventListener("click", () => toggleSearch($("searchbox").hidden));
+  // Esc tanca la cerca i torna el focus al botó (§15.2)
+  $("q").addEventListener("keydown", e => { if (e.key === "Escape" && $("results").hidden) { toggleSearch(false); $("find").focus(); } });
   let qt;
   $("q").addEventListener("input", e => {
     clearTimeout(qt);
@@ -549,7 +582,7 @@ button, input { font: inherit; color: inherit; }
         $("results").onclick = (ev) => {
           const b = ev.target.closest("button"); if (!b) return;
           const r = res[+b.dataset.i];
-          $("results").hidden = true; $("q").value = ""; $("searchbox").hidden = true;
+          $("results").hidden = true; $("q").value = ""; toggleSearch(false);
           load({ name: r.name, sub: r.admin2 || r.admin1 || "", lat: r.latitude, lon: r.longitude, here: false });
         };
       } catch { $("results").innerHTML = "<div class=status style='padding:12px'>Error en la cerca</div>"; $("results").hidden = false; }
