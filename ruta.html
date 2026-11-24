@@ -146,7 +146,16 @@ header { display: grid; gap: 14px; }
 .mapopts input { width: 22px; height: 22px; margin: 0; accent-color: var(--accent); }
 .wx-pin .e { font-size: 15px; }
 .end-pin { width: 16px; height: 16px; border-radius: 50%; border: 3px solid var(--surface); box-shadow: 0 0 0 1px rgba(0,0,0,.4); transform: translate(-50%, -50%); position: absolute; }
-.leaflet-popup-content { font: 13px/1.45 var(--f-body); }
+.leaflet-popup-content { font: 14px/1.45 var(--f-body); margin: 12px 14px; }
+.pop { display: grid; gap: 8px; min-width: 220px; }
+.pop .ph { display: grid; gap: 0; } .pop .ph b { font-size: 1.1rem; } .pop .ph span { color: #5b6b77; font-size: .8125rem; }
+.pop .pbig { display: flex; align-items: center; gap: 10px; } .pop .pbig .e { font-size: 2rem; line-height: 1; }
+.pop .pbig small { display: block; color: #5b6b77; font-size: .8125rem; }
+.pop .pg { margin: 0; display: grid; gap: 3px; } .pop .pg > div { display: grid; grid-template-columns: 5.6em minmax(0, 1fr); gap: 8px; }
+.pop dt { color: #5b6b77; } .pop dd { margin: 0; }
+.pop .r { color: #1f6fa8; } .pop .s { color: #a8326f; } .pop .w { color: #b5541c; }
+.pop .pnote { color: #5b6b77; font-size: .8125rem; border-top: 1px solid #d6dee4; padding-top: 6px; }
+.row.sel { background: var(--dry); outline: 3px solid var(--accent); outline-offset: -3px; }
 .leaflet-popup-content .pbtns { display: flex; gap: 6px; margin-top: 6px; }
 
 .list { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
@@ -425,7 +434,7 @@ header { display: grid; gap: 14px; }
     }
     return out.map(r => {
       const mid = r.pts[Math.floor(r.pts.length / 2)];
-      return { name: r.f?.name, comarca: r.f?.comarca, cat: !!r.f, pts: r.pts, from: r.pts[0].d, to: r.pts.at(-1).d, mid };
+      return { f: r.f, name: r.f?.name, comarca: r.f?.comarca, cat: !!r.f, pts: r.pts, from: r.pts[0].d, to: r.pts.at(-1).d, mid };
     });
   }
 
@@ -563,13 +572,15 @@ header { display: grid; gap: 14px; }
     return osm.addTo(m);
   }
   // ---------- Mapa ----------
-  let map, layer, endsLayer;
+  let map, layer, endsLayer, muniLayer;
   function initMap() {
     if (!window.L) { $("map").innerHTML = "<p class=status style='padding:16px'>No s'ha pogut carregar el mapa.</p>"; return; }
     const RM = matchMedia("(prefers-reduced-motion: reduce)").matches; // sense animacions de zoom si es demana menys moviment
     map = L.map("map", { zoomAnimation: !RM, fadeAnimation: !RM, markerZoomAnimation: !RM }).setView([41.7, 1.75], 8);
     baseLayer(map);
-    layer = L.layerGroup().addTo(map); endsLayer = L.layerGroup().addTo(map);
+    layer = L.layerGroup().addTo(map); endsLayer = L.layerGroup().addTo(map); muniLayer = L.layerGroup().addTo(map);
+    // En tancar el globus (clic al mapa, Esc, tancar) es deixa d'il·luminar el municipi.
+    map.on("popupclose", () => { if (!openingPop) clearSel(); });
     map.on("click", async (e) => {
       await munisReady;
       const f = muniAt(e.latlng.lng, e.latlng.lat);
@@ -596,7 +607,7 @@ header { display: grid; gap: 14px; }
     const my = ++seq;
     $("go").disabled = true;
     $("summary").innerHTML = ""; $("list").innerHTML = ""; $("mode").innerHTML = ""; $("save").hidden = true;
-    layer?.clearLayers();
+    layer?.clearLayers(); selIdx = -1; muniLayer?.clearLayers();
     try {
       setStatus("Calculant la ruta…");
       const [r] = await Promise.all([route(A, B), munisReady]);
@@ -661,7 +672,7 @@ header { display: grid; gap: 14px; }
         if (!icons) return;
         const m = L.marker([s.mid.lat, s.mid.lon], { icon: L.divIcon({ className: "wx-ico", html: `<span class="wx-pin ${s.k}${gl ? " gust" : ""}${gl === 2 ? " vgust" : ""}"><span class=e>${e}</span>${lab}</span>`, iconSize: [0, 0] }), title: s.name || "" })
           .bindPopup(() => popupHtml(s)).addTo(layer);
-        m.on("click", () => focusRow(i));
+        m.on("click", () => { selectSeg(i); focusRow(i); });
         s.marker = m; markers.push(m);
       });
     }
@@ -723,9 +734,25 @@ header { display: grid; gap: 14px; }
     parts.push(`núvols ${Math.round(w.cloud_cover)}%`);
     return parts.join(" · ");
   }
+  // Globus complet del municipi: temps a l'hora de pas, pluja, vent, núvols i el tros de ruta que hi fas.
   function popupHtml(s) {
     const w = s.w; const [e, t] = look(s);
-    return `<b>${esc(s.name || "…")}</b> <span class=status>${esc(s.comarca || "")}</span><br>${e} ${t}${w ? `, <b>${fmt1(w.temperature_2m)} °C</b> (sensació ${Math.round(w.apparent_temperature)}°)` : ""}<br>${detail(s)}<br><span class=status>km ${fmtKm(s.mid.d)} · hi passes cap a les ${fmtClock(s.eta)} · ${w?.src === "fc" ? "previsió per a aquesta hora" : "temps d'ara"}</span>`;
+    const km = (s.to - s.from) / 1000;
+    const secs = Number.isFinite(s.pts.at(-1).t - s.pts[0].t) ? s.pts.at(-1).t - s.pts[0].t : null;
+    const row = (k, v) => `<div><dt>${k}</dt><dd>${v}</dd></div>`;
+    let g = "";
+    if (w) {
+      const pr = w.src === "fc" && w.precipitation_probability != null ? ` · prob. ${Math.round(w.precipitation_probability)}%` : "";
+      g += row("Pluja", (s.k === "wet" ? `<b class=r>${fmt1(w.precipitation)} mm/h</b>` : s.k === "snow" ? `<b class=s>neu ${fmt1(w.snowfall)} cm/h</b>` : "sense pluja") + pr);
+      g += row("Vent", `${windTxt(w.wind_speed_10m)}, ${Math.round(w.wind_speed_10m)} km/h ${dirTxt(w.wind_direction_10m)}`);
+      g += row("Ràfegues", `${w.wind_gusts_10m >= GUST_STRONG ? "<b class=w>💨 " : "<b>"}${Math.round(w.wind_gusts_10m)} km/h</b>`);
+      g += row("Núvols", `${Math.round(w.cloud_cover)}%`);
+    }
+    g += row("Hi passes", `${fmtClock(s.eta)} · km ${fmtKm(s.mid.d)}`);
+    g += row("Al municipi", `${fmtKm(km * 1000)} km${secs ? " · " + fmtDur(secs) : ""} de ruta`);
+    return `<div class=pop><div class=ph><b>${esc(s.name || "…")}</b>${s.comarca ? `<span>${esc(s.comarca)}</span>` : ""}</div>`
+      + (w ? `<div class=pbig><span class=e aria-hidden=true>${e}</span><span><b>${fmt1(w.temperature_2m)} °C</b> · ${esc(t)}<small>sensació ${Math.round(w.apparent_temperature)}°</small></span></div>` : `<div class=pbig>Sense dades de temps</div>`)
+      + `<dl class=pg>${g}</dl><div class=pnote>${w?.src === "fc" ? "Previsió per a aquesta hora" : "Temps d'ara"}</div></div>`;
   }
 
   function renderList() {
@@ -750,8 +777,26 @@ header { display: grid; gap: 14px; }
   }
   function rowHtml(s, i) {
       const w = s.w; const [e, t] = look(s);
-      return `<div class="row ${s.k}" style="border-left-color:${CATS[s.cat || "none"].c}" tabindex=0 role=button data-i=${i}><span class=e aria-hidden=true title="${esc(t)}">${e}</span><span class=n>${esc(s.name || "Buscant el nom…")}<small>km ${fmtKm(s.mid.d)} · hi passes ${fmtClock(s.eta)}</small></span><span class=t>${w ? Math.round(w.temperature_2m) + "°" : "–"}</span><span class=d>${esc(t)} · ${detail(s)}</span></div>`;
+      return `<div class="row ${s.k}${i === selIdx ? " sel" : ""}" style="border-left-color:${CATS[s.cat || "none"].c}" tabindex=0 role=button data-i=${i}><span class=e aria-hidden=true title="${esc(t)}">${e}</span><span class=n>${esc(s.name || "Buscant el nom…")}<small>km ${fmtKm(s.mid.d)} · hi passes ${fmtClock(s.eta)}</small></span><span class=t>${w ? Math.round(w.temperature_2m) + "°" : "–"}</span><span class=d>${esc(t)} · ${detail(s)}</span></div>`;
   }
+  // ---------- Municipi il·luminat al mapa ----------
+  let selIdx = -1, openingPop = false;
+  function paintOutline(i) {
+    muniLayer?.clearLayers();
+    const s = segs[i]; if (!map || !s?.f) return null;
+    const ll = s.f.rings.map(r => r.map(([x, y]) => [y, x]));
+    const c = CATS[s.cat || "none"].c;
+    const halo = L.polygon(ll, { color: cssVar("--surface") || "#fff", weight: 9, opacity: .9, fill: false, interactive: false, lineJoin: "round" }).addTo(muniLayer);
+    const poly = L.polygon(ll, { color: cssVar("--accent") || "#1f6fa8", weight: 4, opacity: 1, fillColor: c, fillOpacity: .22, interactive: false, lineJoin: "round" }).addTo(muniLayer);
+    poly.bringToBack(); halo.bringToBack(); // per sota de la línia de la ruta
+    return poly.getBounds();
+  }
+  function markRows() {
+    $("list").querySelectorAll(".row.sel").forEach(r => r.classList.remove("sel"));
+    if (selIdx >= 0) $("list").querySelector(`.row[data-i="${selIdx}"]`)?.classList.add("sel");
+  }
+  function selectSeg(i) { selIdx = i; markRows(); return paintOutline(i); }
+  function clearSel() { selIdx = -1; muniLayer?.clearLayers(); markRows(); }
   function focusRow(i) {
     const el = $("list").querySelector(`[data-i="${i}"]`);
     const g = el?.closest("details"); if (g) g.open = true;
@@ -759,11 +804,25 @@ header { display: grid; gap: 14px; }
   }
   function openSeg(i, at) {
     const s = segs[i]; if (!s || !map) return;
-    if (!at) map.setView([s.mid.lat, s.mid.lon], Math.max(map.getZoom(), 11));
-    if (s.marker) s.marker.openPopup(); else L.popup().setLatLng(at || [s.mid.lat, s.mid.lon]).setContent(popupHtml(s)).openOn(map);
+    const b = selectSeg(i);
+    if (!at) {
+      if (b) map.fitBounds(b, { padding: [40, 40], maxZoom: 12, animate: false }); // el municipi sencer
+      else map.setView([s.mid.lat, s.mid.lon], Math.max(map.getZoom(), 11), { animate: false });
+    }
+    openingPop = true; // obrir un globus nou tanca l'anterior: que no esborri la selecció
+    try {
+      if (s.marker) s.marker.openPopup(); else L.popup({ maxWidth: 300, autoPanPadding: [24, 24] }).setLatLng(at || [s.mid.lat, s.mid.lon]).setContent(popupHtml(s)).openOn(map);
+    } finally { openingPop = false; }
     if (at) return;
     if (!window.matchMedia("(min-width: 901px)").matches) $("map").scrollIntoView({ behavior: "smooth", block: "center" });
   }
+  // Esc tanca el globus i apaga el municipi il·luminat
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && selIdx >= 0) { map?.closePopup(); clearSel(); } });
+  // Amb ratolí, passar per sobre d'un municipi de la llista el mostra al mapa sense moure res.
+  const hoverOk = matchMedia("(hover: hover)");
+  const rowOf = (e) => e.target.closest?.(".row");
+  $("list").addEventListener("mouseover", e => { const r = rowOf(e); if (r && hoverOk.matches && +r.dataset.i !== selIdx) paintOutline(+r.dataset.i); });
+  $("list").addEventListener("mouseleave", () => { if (hoverOk.matches) selIdx >= 0 ? paintOutline(selIdx) : muniLayer?.clearLayers(); });
   $("list").addEventListener("click", e => { const r = e.target.closest(".row"); if (r) openSeg(+r.dataset.i); });
   $("list").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { const r = e.target.closest(".row"); if (r) { if (e.key === " ") e.preventDefault(); openSeg(+r.dataset.i); } } });
 
