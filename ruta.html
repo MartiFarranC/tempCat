@@ -1052,11 +1052,12 @@ body.navving { overflow: hidden; }
   }
   const W = (a, b) => ["interpolate", ["exponential", 1.5], ["zoom"], 8, a, 18, b];
   function navLayers() {
-    const m = NAV.map; if (!m || !m.isStyleLoaded()) return;
+    // No es fa servir isStyleLoaded(): amb l'estil real dona false fins que arriben les teseles, i la ruta no es pintava.
+    const m = NAV.map; if (!m) return; let st; try { st = m.getStyle(); } catch { return; } if (!st?.layers) return;
     const dark = isDark();
     // Edificis en relleu, discrets, a sota de les etiquetes.
-    const vsrc = Object.entries(m.getStyle().sources).find(([, v]) => v.type === "vector")?.[0];
-    const firstSym = m.getStyle().layers.find(l => l.type === "symbol")?.id;
+    const vsrc = Object.entries(st.sources || {}).find(([, v]) => v.type === "vector")?.[0];
+    const firstSym = st.layers.find(l => l.type === "symbol")?.id;
     if (vsrc && !m.getLayer("b3d")) m.addLayer({ id: "b3d", type: "fill-extrusion", source: vsrc, "source-layer": "building", minzoom: 14,
       paint: { "fill-extrusion-color": dark ? "#2a3742" : "#e4e8ec", "fill-extrusion-opacity": .9, "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0],
         "fill-extrusion-height": ["interpolate", ["linear"], ["zoom"], 14, 0, 15.5, ["coalesce", ["get", "render_height"], 6]] } }, firstSym);
@@ -1158,7 +1159,8 @@ body.navving { overflow: hidden; }
     const fb = setTimeout(() => { if (!loaded) m.setStyle(FALLBACK_STYLE()); }, 9000);
     m.on("error", (e) => { if (!loaded && /style|openfreemap/i.test(String(e?.error?.message || e?.error?.url || ""))) { clearTimeout(fb); loaded = true; m.setStyle(FALLBACK_STYLE()); } });
     m.on("style.load", () => { loaded = true; clearTimeout(fb); navLayers(); });
-    m.on("load", () => { loaded = true; clearTimeout(fb); });
+    m.on("load", () => { loaded = true; clearTimeout(fb); navLayers(); });
+    m.on("styledata", () => { if (!m.getSource("rt")) navLayers(); });
     // Si mous el mapa amb el dit, deixa de seguir-te fins que toquis Recentra.
     for (const ev of ["dragstart", "zoomstart", "rotatestart", "pitchstart"]) m.on(ev, (e) => { if (e.originalEvent) setFollow(false); });
     const meEl = document.createElement("div"); meEl.className = "nv-me"; meEl.setAttribute("role", "img"); meEl.setAttribute("aria-label", "La teva posició");
