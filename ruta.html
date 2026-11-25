@@ -223,11 +223,21 @@ header { display: grid; gap: 14px; }
 .nv-btn { min-width: 52px; min-height: 52px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: 600 15px/1 var(--f-body); box-shadow: 0 4px 16px rgba(0,0,0,.18); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 16px; }
 .nv-btn.exit { color: var(--warn); }
 .nv-btn[hidden] { display: none; }
+.nv-strip { max-width: 560px; width: 100%; justify-self: center; padding: 8px 16px 10px; display: grid; gap: 4px; }
+.nv-track { position: relative; height: 44px; }
+.nv-bar { position: absolute; left: 0; right: 0; bottom: 4px; height: 14px; border-radius: 7px; overflow: hidden; display: flex; box-shadow: inset 0 0 0 1px rgba(0,0,0,.25); }
+.nv-bar i { display: block; height: 100%; flex: none; }
+.nv-done { position: absolute; inset: 0; background: repeating-linear-gradient(135deg, var(--field) 0 5px, var(--line) 5px 9px); opacity: .92; transform-origin: left center; transform: scaleX(0); }
+.nv-carw { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; transform: translateX(0); pointer-events: none; }
+.nv-car { position: absolute; left: 0; bottom: 10px; font-size: 26px; line-height: 1; transform: translateX(-50%) scaleX(-1); filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)); }
+.nv-ends { display: flex; justify-content: space-between; gap: 12px; font-size: .8125rem; color: var(--muted); }
+.nv-ends span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (prefers-reduced-motion: no-preference) { .nv-done, .nv-carw { transition: transform 900ms linear; } }
 .nv-me { width: 44px; height: 44px; }
 .nv-me svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
 .nv-end { width: 18px; height: 18px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.45); }
 #nav .maplibregl-ctrl-attrib { font-size: .75rem; }
-#nav .maplibregl-ctrl-bottom-right, #nav .maplibregl-ctrl-bottom-left { bottom: calc(max(12px, env(safe-area-inset-bottom, 0px)) + 64px); }
+#nav .maplibregl-ctrl-bottom-right, #nav .maplibregl-ctrl-bottom-left { bottom: calc(max(12px, env(safe-area-inset-bottom, 0px)) + 150px); }
 body.navving { overflow: hidden; }
 @media (min-width: 900px) { .nv-top { left: auto; width: 420px; } .nv-top .nv-card { justify-self: stretch; } }
 /* Mides de toc, estats i moviment segons docs/guia-disseny.md (§3.1, §15.2, §14.9). */
@@ -312,6 +322,10 @@ body.navving { overflow: hidden; }
     <div class="nv-card nv-msg" id="nvmsg" role="status"></div>
   </div>
   <div class="nv-bot">
+    <div class="nv-card nv-strip" id="nvstrip" role="progressbar" aria-label="Recorregut fet" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <div class="nv-track"><div class="nv-bar" id="nvbar"></div><div class="nv-carw" id="nvcarw"><span class="nv-car" aria-hidden="true">🚗</span></div></div>
+      <div class="nv-ends"><span id="nvfrom"></span><span id="nvto"></span></div>
+    </div>
     <div class="nv-row">
       <button class="nv-btn exit" id="nvexit" type="button"><span aria-hidden="true">✕</span> Surt</button>
       <div class="nv-card nv-stats" id="nvstats"></div>
@@ -1073,9 +1087,24 @@ body.navving { overflow: hidden; }
   function navRefresh() { // el temps o els noms han canviat mentre navegues
     if (!NAV.open || !NAV.map?.getSource("rt")) return;
     NAV.map.getSource("rt").setData(navRouteData());
+    navStrip();
     if (NAV.last) navUpdate(NAV.last, true);
   }
 
+  // Barra recta del recorregut: trams amb el color de la previsió, ratllat el que ja has fet i el cotxe on ets.
+  function navStrip() {
+    const total = NAV.cd?.at(-1) || 1;
+    $("nvbar").innerHTML = segs.map((s, i) => { const to = segs[i + 1] ? segs[i + 1].from : total;
+      return `<i style="width:${(Math.max(0, to - s.from) / total * 100).toFixed(3)}%;background:${(CATS[s.cat] || CATS.none).c}"></i>`; }).join("") + `<div class=nv-done id=nvdone></div>`;
+    $("nvfrom").textContent = short(A); $("nvto").textContent = B.name;
+  }
+  function navStripAt(d) {
+    const f = Math.max(0, Math.min(1, d / (NAV.cd.at(-1) || 1)));
+    $("nvdone") && ($("nvdone").style.transform = `scaleX(${f})`);
+    $("nvcarw").style.transform = `translateX(${(f * 100).toFixed(2)}%)`;
+    const st = $("nvstrip"); st.setAttribute("aria-valuenow", String(Math.round(f * 100)));
+    st.setAttribute("aria-valuetext", `${fmtKm(d)} de ${fmtKm(NAV.cd.at(-1))} km fets`);
+  }
   function navMsg(html, warn) { const el = $("nvmsg"); el.innerHTML = html || ""; el.classList.toggle("warn", !!warn); }
   function segAt(d) { let k = 0; while (k < segs.length - 1 && segs[k + 1].from <= d) k++; return k; }
   function navHud(d, offBy) {
@@ -1089,6 +1118,7 @@ body.navving { overflow: hidden; }
       const changes = (nx.cat !== s.cat);
       next = `<span role=img aria-label="${esc(t2)}">${e2}</span><span>${changes ? "Canvia: " : "Després: "}<b>${esc(nx.name || "…")}</b> d'aquí ${fmtKm(Math.max(0, nx.from - d))} km · ${w2 ? Math.round(w2.temperature_2m) + "°" : ""}${nx.k === "wet" ? ` <span class=r>${fmt1(w2.precipitation)} mm</span>` : nx.k === "snow" ? " <span class=s>neu</span>" : ""}</span>`;
     }
+    navStripAt(d);
     $("nvnow").innerHTML = `<span class=e role=img aria-label="${esc(txt)}">${e}</span><span class=n>${esc(s.name || "…")}<small>${esc(txt)}${mm}${s.comarca ? " · " + esc(s.comarca) : ""}</small></span><span class=t>${w ? Math.round(w.temperature_2m) + "°" : ""}</span><div class=nv-next>${next}</div>`;
     $("nvstats").innerHTML = left < 40 ? `<b>Has arribat</b><span>${esc(B.name)}</span>`
       : `<b>${fmtKm(left)} km · ${fmtDur(tLeft)}</b><span>Arribada cap a les ${fmtClock(Date.now() + tLeft * 1000)}</span>`;
@@ -1150,6 +1180,7 @@ body.navving { overflow: hidden; }
     history.pushState({ nav: 1 }, ""); $("nvexit").focus();
     navPrep(); setFollow(true); navMsg("Carregant el mapa 3D…");
     $("nvnow").innerHTML = ""; $("nvstats").innerHTML = "";
+    navStrip(); navStripAt(0);
     try { await loadMapLibre(); } catch { navMsg("No s'ha pogut carregar el mapa 3D. Revisa la connexió i torna-ho a provar.", true); return; }
     if (!NAV.open) return;
     const start = lastRoute.coords[0];
