@@ -197,47 +197,56 @@ header { display: grid; gap: 14px; }
 /* Navegació en directe (§19.2): capa a pantalla completa amb mapa vectorial 3D (MapLibre + OpenFreeMap). */
 .navbtn { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 8px 14px; border: 0; border-radius: 999px; background: var(--accent); color: var(--surface); font: 600 15px/1.2 var(--f-body); cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
 .navbtn[hidden] { display: none; }
-#nav { position: fixed; inset: 0; z-index: 3000; background: var(--bg); color: var(--fg); }
+/* La navegació sempre en fosc (proposta D), sigui quin sigui el tema de la pàgina. */
+#nav { --bg: #0f171d; --surface: #16212a; --fg: #e3ebf0; --muted: #91a2ae; --line: #2a3943; --field: #5f7380;
+  --accent: #6bb3e6; --rain: #4aa3ea; --snow: #b48cf0; --warn: #e8935f; --ok: #6cc28f; color-scheme: dark;
+  position: fixed; inset: 0; z-index: 3000; background: var(--bg); color: var(--fg); }
 #navmap { position: absolute; inset: 0; }
 .nv-top, .nv-bot { position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); z-index: 2; display: grid; gap: 8px; pointer-events: none; }
 .nv-top { top: max(12px, env(safe-area-inset-top, 0px)); }
 .nv-bot { bottom: max(12px, env(safe-area-inset-bottom, 0px)); }
 .nv-top > *, .nv-bot > * { pointer-events: auto; }
-.nv-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 4px 16px rgba(0,0,0,.18); padding: 10px 14px; max-width: 560px; width: 100%; justify-self: center; }
-.nv-now { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; }
-.nv-now .e { font-size: 2rem; line-height: 1; }
-.nv-now .n { font-family: var(--f-display); font-size: 1.35rem; font-weight: 700; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nv-now .n small { display: block; font-family: var(--f-body); font-weight: 400; font-size: .8125rem; color: var(--muted); white-space: normal; }
-.nv-now .t { font-family: var(--f-display); font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-.nv-next { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; border-top: 1px solid var(--line); margin-top: 6px; padding-top: 6px; font-size: .9375rem; }
-.nv-next:empty { display: none; }
-.nv-next b { font-weight: 600; } .nv-next .r { color: var(--rain); font-weight: 600; } .nv-next .s { color: var(--snow); font-weight: 600; }
+.nv-card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 6px 22px rgba(0,0,0,.4); padding: 10px 14px; max-width: 560px; width: 100%; justify-self: center; }
+/* Avís gran del proper canvi de temps (proposta D) */
+.nv-alert { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; align-items: center; padding: 14px 16px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); border-left: 6px solid var(--cc, var(--line)); box-shadow: 0 6px 22px rgba(0,0,0,.4); max-width: 560px; width: 100%; justify-self: center; }
+.nv-alert:empty { display: none; }
+.nv-alert.fill { background: var(--cc); border-color: var(--cc); color: #fff; }
+.nv-alert .ic { text-align: center; min-width: 56px; }
+.nv-alert .ic .e { display: block; font-size: 2.5rem; line-height: 1; }
+.nv-alert .ic b { font-family: var(--f-display); font-size: 1.125rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nv-alert .tt { font-family: var(--f-display); font-size: 1.5rem; font-weight: 700; line-height: 1.1; }
+.nv-alert .sb { font-size: .875rem; opacity: .92; }
+.nv-pills { display: flex; flex-wrap: wrap; gap: 8px; max-width: 560px; width: 100%; justify-self: center; }
+.nv-pills:empty { display: none; }
+.nv-pill { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 12px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 4px 14px rgba(0,0,0,.35); font-weight: 600; font-size: .9375rem; font-variant-numeric: tabular-nums; max-width: 100%; }
+.nv-pill .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.nv-pill.warn { color: var(--warn); border-color: var(--warn); }
 .nv-msg { font-size: .9375rem; display: grid; gap: 8px; }
 .nv-msg:empty { display: none; }
 .nv-msg.warn { border-color: var(--warn); }
 .nv-msg .btn { justify-self: start; }
-.nv-row { display: flex; align-items: center; gap: 10px; max-width: 560px; width: 100%; justify-self: center; }
-.nv-stats { flex: 1; min-width: 0; padding: 8px 14px; display: grid; gap: 0; }
-.nv-stats b { font-family: var(--f-display); font-size: 1.25rem; font-variant-numeric: tabular-nums; }
-.nv-stats span { font-size: .8125rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-.nv-btn { min-width: 52px; min-height: 52px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: 600 15px/1 var(--f-body); box-shadow: 0 4px 16px rgba(0,0,0,.18); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 16px; }
-.nv-btn.exit { color: var(--warn); }
+.nv-panel { padding: 12px 16px 14px; display: grid; gap: 6px; border-radius: 22px; }
+.nv-arr { display: flex; align-items: center; gap: 12px; }
+.nv-clock { font-family: var(--f-display); font-size: 2.25rem; line-height: 1; font-weight: 700; color: var(--ok); font-variant-numeric: tabular-nums; }
+.nv-stats { flex: 1; min-width: 0; display: grid; font-size: .875rem; color: var(--muted); line-height: 1.3; }
+.nv-stats b { color: var(--fg); font-size: 1rem; font-variant-numeric: tabular-nums; }
+.nv-btn { min-width: 52px; min-height: 52px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: 600 15px/1 var(--f-body); box-shadow: 0 4px 16px rgba(0,0,0,.35); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 16px; }
+.nv-btn.exit { min-height: 44px; min-width: 0; background: var(--warn); border-color: var(--warn); color: var(--bg); box-shadow: none; }
+.nv-btn.center { justify-self: end; padding: 0; font-size: 1.25rem; }
 .nv-btn[hidden] { display: none; }
-.nv-strip { max-width: 560px; width: 100%; justify-self: center; padding: 8px 16px 10px; display: grid; gap: 4px; }
-.nv-track { position: relative; height: 44px; }
-.nv-bar { position: absolute; left: 0; right: 0; bottom: 4px; height: 14px; border-radius: 7px; overflow: hidden; display: flex; box-shadow: inset 0 0 0 1px rgba(0,0,0,.25); }
+.nv-bot .nv-row { max-width: 560px; width: 100%; justify-self: center; display: grid; }
+.nv-track { position: relative; height: 40px; }
+.nv-bar { position: absolute; left: 0; right: 0; bottom: 2px; height: 12px; border-radius: 6px; overflow: hidden; display: flex; box-shadow: inset 0 0 0 1px rgba(0,0,0,.25); }
 .nv-bar i { display: block; height: 100%; flex: none; }
-.nv-done { position: absolute; inset: 0; background: repeating-linear-gradient(135deg, var(--field) 0 5px, var(--line) 5px 9px); opacity: .92; transform-origin: left center; transform: scaleX(0); }
+.nv-done { position: absolute; inset: 0; background: repeating-linear-gradient(135deg, var(--field) 0 5px, var(--line) 5px 9px); opacity: .95; transform-origin: left center; transform: scaleX(0); }
 .nv-carw { position: absolute; left: 0; right: 0; bottom: 0; height: 100%; transform: translateX(0); pointer-events: none; }
-.nv-car { position: absolute; left: 0; bottom: 10px; font-size: 26px; line-height: 1; transform: translateX(-50%) scaleX(-1); filter: drop-shadow(0 1px 2px rgba(0,0,0,.35)); }
-.nv-ends { display: flex; justify-content: space-between; gap: 12px; font-size: .8125rem; color: var(--muted); }
-.nv-ends span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nv-car { position: absolute; left: 0; bottom: 8px; font-size: 26px; line-height: 1; transform: translateX(-50%) scaleX(-1); filter: drop-shadow(0 1px 2px rgba(0,0,0,.5)); }
 @media (prefers-reduced-motion: no-preference) { .nv-done, .nv-carw { transition: transform 900ms linear; } }
 .nv-me { width: 44px; height: 44px; }
 .nv-me svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
 .nv-end { width: 18px; height: 18px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.45); }
 #nav .maplibregl-ctrl-attrib { font-size: .75rem; }
-#nav .maplibregl-ctrl-bottom-right, #nav .maplibregl-ctrl-bottom-left { bottom: calc(max(12px, env(safe-area-inset-bottom, 0px)) + 150px); }
+#nav .maplibregl-ctrl-bottom-right, #nav .maplibregl-ctrl-bottom-left { bottom: calc(max(12px, env(safe-area-inset-bottom, 0px)) + 120px); }
 body.navving { overflow: hidden; }
 @media (min-width: 900px) { .nv-top { left: auto; width: 420px; } .nv-top .nv-card { justify-self: stretch; } }
 /* Mides de toc, estats i moviment segons docs/guia-disseny.md (§3.1, §15.2, §14.9). */
@@ -318,18 +327,17 @@ body.navving { overflow: hidden; }
 <div id="nav" role="dialog" aria-modal="true" aria-label="Navegació de la ruta" hidden>
   <div id="navmap"></div>
   <div class="nv-top">
-    <div class="nv-card nv-now" id="nvnow" aria-live="polite"></div>
+    <div class="nv-alert" id="nvalert" aria-live="polite"></div>
+    <div class="nv-pills" id="nvpills"></div>
     <div class="nv-card nv-msg" id="nvmsg" role="status"></div>
   </div>
   <div class="nv-bot">
-    <div class="nv-card nv-strip" id="nvstrip" role="progressbar" aria-label="Recorregut fet" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-      <div class="nv-track"><div class="nv-bar" id="nvbar"></div><div class="nv-carw" id="nvcarw"><span class="nv-car" aria-hidden="true">🚗</span></div></div>
-      <div class="nv-ends"><span id="nvfrom"></span><span id="nvto"></span></div>
-    </div>
-    <div class="nv-row">
-      <button class="nv-btn exit" id="nvexit" type="button"><span aria-hidden="true">✕</span> Surt</button>
-      <div class="nv-card nv-stats" id="nvstats"></div>
-      <button class="nv-btn" id="nvcenter" type="button" hidden><span aria-hidden="true">◎</span> Recentra</button>
+    <div class="nv-row"><button class="nv-btn center" id="nvcenter" type="button" aria-label="Recentra el mapa" title="Recentra" hidden><span aria-hidden="true">◎</span></button></div>
+    <div class="nv-card nv-panel">
+      <div class="nv-arr"><span class="nv-clock" id="nvclock"></span><span class="nv-stats" id="nvstats"></span><button class="nv-btn exit" id="nvexit" type="button"><span aria-hidden="true">✕</span> Surt</button></div>
+      <div id="nvstrip" role="progressbar" aria-label="Recorregut fet" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="nv-track"><div class="nv-bar" id="nvbar"></div><div class="nv-carw" id="nvcarw"><span class="nv-car" aria-hidden="true">🚗</span></div></div>
+      </div>
     </div>
   </div>
 </div>
@@ -1002,7 +1010,7 @@ body.navving { overflow: hidden; }
   // MapLibre GL (vendor/maplibre) amb l'estil vectorial gratuït d'OpenFreeMap (Positron, o Dark en tema fosc)
   // i edificis en relleu. La càmera segueix el GPS, inclinada i girada cap on vas. Es carrega només en entrar-hi.
   const NAV = { open: false, map: null, watch: null, sim: null, follow: true, lock: null, cd: null, ct: null, last: null, me: null, ends: [], prog: 0, offFar: false };
-  const isDark = () => document.documentElement.dataset.theme === "dark" || (document.documentElement.dataset.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+  const isDark = () => true; // proposta D: la navegació va sempre amb el mapa fosc
   const RMNAV = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
   let mlReady = null;
   function loadMapLibre() {
@@ -1096,7 +1104,6 @@ body.navving { overflow: hidden; }
     const total = NAV.cd?.at(-1) || 1;
     $("nvbar").innerHTML = segs.map((s, i) => { const to = segs[i + 1] ? segs[i + 1].from : total;
       return `<i style="width:${(Math.max(0, to - s.from) / total * 100).toFixed(3)}%;background:${(CATS[s.cat] || CATS.none).c}"></i>`; }).join("") + `<div class=nv-done id=nvdone></div>`;
-    $("nvfrom").textContent = short(A); $("nvto").textContent = B.name;
   }
   function navStripAt(d) {
     const f = Math.max(0, Math.min(1, d / (NAV.cd.at(-1) || 1)));
@@ -1107,21 +1114,38 @@ body.navving { overflow: hidden; }
   }
   function navMsg(html, warn) { const el = $("nvmsg"); el.innerHTML = html || ""; el.classList.toggle("warn", !!warn); }
   function segAt(d) { let k = 0; while (k < segs.length - 1 && segs[k + 1].from <= d) k++; return k; }
+  // Avís gran: el proper canvi de temps, a quina distància i quants km dura.
+  const WETC = ["rain", "heavy", "storm"];
+  const ALERT = { clear: "Surt el sol", night: "Cel serè", partly: "Mig ennuvolat", overcast: "Es tapa el cel", fog: "Boira", rain: "Comença a ploure", heavy: "Pluja forta", storm: "Tempesta", snow: "Comença a nevar", none: "Sense previsió" };
+  const FILL = { rain: "#1f6fa8", heavy: "#1b3f9e", storm: "#7d2fa8", snow: "#a8326f" }; // amb text blanc ≥ 4,5:1
   function navHud(d, offBy) {
-    const k = segAt(d), s = segs[k], left = Math.max(0, NAV.cd.at(-1) - d), tLeft = Math.max(0, NAV.ct.at(-1) - timeAt(d));
+    const total = NAV.cd.at(-1), k = segAt(d), s = segs[k], left = Math.max(0, total - d), tLeft = Math.max(0, NAV.ct.at(-1) - timeAt(d));
     const [e, txt] = look(s), w = s.w;
-    const mm = w && s.k === "wet" ? ` · <span class=r>${fmt1(w.precipitation)} mm</span>` : w && s.k === "snow" ? " · <span class=s>neu</span>" : "";
-    const nx = segs.slice(k + 1).find(x => x.name && x.name !== s.name) || segs[k + 1];
-    let next = "";
-    if (nx) {
-      const [e2, t2] = look(nx), w2 = nx.w;
-      const changes = (nx.cat !== s.cat);
-      next = `<span role=img aria-label="${esc(t2)}">${e2}</span><span>${changes ? "Canvia: " : "Després: "}<b>${esc(nx.name || "…")}</b> d'aquí ${fmtKm(Math.max(0, nx.from - d))} km · ${w2 ? Math.round(w2.temperature_2m) + "°" : ""}${nx.k === "wet" ? ` <span class=r>${fmt1(w2.precipitation)} mm</span>` : nx.k === "snow" ? " <span class=s>neu</span>" : ""}</span>`;
-    }
     navStripAt(d);
-    $("nvnow").innerHTML = `<span class=e role=img aria-label="${esc(txt)}">${e}</span><span class=n>${esc(s.name || "…")}<small>${esc(txt)}${mm}${s.comarca ? " · " + esc(s.comarca) : ""}</small></span><span class=t>${w ? Math.round(w.temperature_2m) + "°" : ""}</span><div class=nv-next>${next}</div>`;
-    $("nvstats").innerHTML = left < 40 ? `<b>Has arribat</b><span>${esc(B.name)}</span>`
-      : `<b>${fmtKm(left)} km · ${fmtDur(tLeft)}</b><span>Arribada cap a les ${fmtClock(Date.now() + tLeft * 1000)}</span>`;
+    const al = $("nvalert");
+    let j = k + 1; while (j < segs.length && segs[j].cat === s.cat) j++;
+    if (left < 40) {
+      al.className = "nv-alert"; al.style.removeProperty("--cc");
+      al.innerHTML = `<span class=ic><span class=e aria-hidden=true>🏁</span></span><span><span class=tt>Has arribat</span><br><span class=sb>${esc(B.name)}</span></span>`;
+    } else if (j < segs.length) {
+      const n = segs[j], [e2, t2] = look(n), w2 = n.w;
+      let e3 = j; while (e3 < segs.length && segs[e3].cat === n.cat) e3++;
+      const runKm = (e3 < segs.length ? segs[e3].from : total) - n.from;
+      const title = WETC.includes(s.cat) && !WETC.includes(n.cat) && n.cat !== "snow" ? "Para de ploure" : s.cat === "snow" && n.cat !== "snow" ? "Para de nevar" : ALERT[n.cat] || t2;
+      const eta = Date.now() + Math.max(0, timeAt(n.from) - timeAt(d)) * 1000;
+      const bits = [esc(n.name || "…"), w2 && n.k ? `${fmt1(w2.precipitation)} mm/h` : "", w2 ? `${Math.round(w2.temperature_2m)}°` : "", `cap a les ${fmtClock(eta)}`].filter(Boolean).join(" · ");
+      al.className = "nv-alert" + (FILL[n.cat] ? " fill" : ""); al.style.setProperty("--cc", FILL[n.cat] || (CATS[n.cat] || CATS.none).c);
+      al.innerHTML = `<span class=ic><span class=e role=img aria-label="${esc(t2)}">${e2}</span><b>${fmtKm(Math.max(0, n.from - d))} km</b></span><span><span class=tt>${esc(title)}</span><br><span class=sb>${bits}${e3 < segs.length ? `<br>Dura uns ${fmtKm(runKm)} km` : "<br>Fins a l'arribada"}</span></span>`;
+    } else {
+      al.className = "nv-alert"; al.style.setProperty("--cc", (CATS[s.cat] || CATS.none).c);
+      al.innerHTML = `<span class=ic><span class=e role=img aria-label="${esc(txt)}">${e}</span></span><span><span class=tt>Sense canvis</span><br><span class=sb>${esc(txt)} fins a l'arribada</span></span>`;
+    }
+    // Pastilles: el temps on ets ara i el vent.
+    const g = w?.wind_gusts_10m || 0, wind = w?.wind_speed_10m;
+    $("nvpills").innerHTML = !w ? "" : `<span class=nv-pill><span role=img aria-label="${esc(txt)}">${e}</span>${Math.round(w.temperature_2m)}° <span class=nm>${esc(s.name || "")}</span></span>`
+      + (g >= GUST_STRONG ? `<span class="nv-pill warn"><span aria-hidden=true>💨</span>Ràfegues de ${Math.round(g)} km/h</span>` : wind != null ? `<span class=nv-pill><span aria-hidden=true>💨</span>${Math.round(wind)} km/h</span>` : "");
+    $("nvclock").textContent = left < 40 ? "✓" : fmtClock(Date.now() + tLeft * 1000);
+    $("nvstats").innerHTML = left < 40 ? `Has arribat<b>${esc(B.name)}</b>` : `arribada<b>${fmtKm(left)} km · ${fmtDur(tLeft)}</b>`;
     if (offBy != null) navMsg(offBy > 80 ? `<span><b>Fora de la ruta</b>, a ${offBy < 1000 ? Math.round(offBy / 10) * 10 + " m" : fmtKm(offBy) + " km"}. Torna a la línia de color.</span>` : "", true);
   }
   function setFollow(on) { NAV.follow = on; $("nvcenter").hidden = on; }
@@ -1179,7 +1203,7 @@ body.navving { overflow: hidden; }
     $("nav").hidden = false; document.querySelector("main").inert = true; document.body.classList.add("navving");
     history.pushState({ nav: 1 }, ""); $("nvexit").focus();
     navPrep(); setFollow(true); navMsg("Carregant el mapa 3D…");
-    $("nvnow").innerHTML = ""; $("nvstats").innerHTML = "";
+    $("nvalert").innerHTML = ""; $("nvpills").innerHTML = ""; $("nvstats").innerHTML = ""; $("nvclock").textContent = "";
     navStrip(); navStripAt(0);
     try { await loadMapLibre(); } catch { navMsg("No s'ha pogut carregar el mapa 3D. Revisa la connexió i torna-ho a provar.", true); return; }
     if (!NAV.open) return;
