@@ -1058,9 +1058,9 @@ body.navving { overflow: hidden; }
     // Edificis en relleu, discrets, a sota de les etiquetes.
     const vsrc = Object.entries(st.sources || {}).find(([, v]) => v.type === "vector")?.[0];
     const firstSym = st.layers.find(l => l.type === "symbol")?.id;
-    if (vsrc && !m.getLayer("b3d")) m.addLayer({ id: "b3d", type: "fill-extrusion", source: vsrc, "source-layer": "building", minzoom: 14,
+    if (vsrc && !m.getLayer("b3d")) try { m.addLayer({ id: "b3d", type: "fill-extrusion", source: vsrc, "source-layer": "building", minzoom: 14,
       paint: { "fill-extrusion-color": dark ? "#2a3742" : "#e4e8ec", "fill-extrusion-opacity": .9, "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0],
-        "fill-extrusion-height": ["interpolate", ["linear"], ["zoom"], 14, 0, 15.5, ["coalesce", ["get", "render_height"], 6]] } }, firstSym);
+        "fill-extrusion-height": ["interpolate", ["linear"], ["zoom"], 14, 0, 15.5, ["coalesce", ["get", "render_height"], 6]] } }, firstSym); } catch (e) { console.warn(e); } // sense edificis, però la ruta s'ha de veure igualment
     if (!m.getSource("rt")) {
       m.addSource("rt", { type: "geojson", data: navRouteData() });
       m.addSource("done", { type: "geojson", data: navDoneData() });
@@ -1161,6 +1161,8 @@ body.navving { overflow: hidden; }
     m.on("style.load", () => { loaded = true; clearTimeout(fb); navLayers(); });
     m.on("load", () => { loaded = true; clearTimeout(fb); navLayers(); });
     m.on("styledata", () => { if (!m.getSource("rt")) navLayers(); });
+    // Per si de cas: reintenta pintar la ruta fins que hi sigui.
+    const retry = setInterval(() => { if (NAV.map !== m) return clearInterval(retry); if (m.getSource("rt")) return clearInterval(retry); navLayers(); }, 700);
     // Si mous el mapa amb el dit, deixa de seguir-te fins que toquis Recentra.
     for (const ev of ["dragstart", "zoomstart", "rotatestart", "pitchstart"]) m.on(ev, (e) => { if (e.originalEvent) setFollow(false); });
     const meEl = document.createElement("div"); meEl.className = "nv-me"; meEl.setAttribute("role", "img"); meEl.setAttribute("aria-label", "La teva posició");
