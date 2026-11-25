@@ -197,10 +197,13 @@ header { display: grid; gap: 14px; }
 /* Navegació en directe (§19.2): capa a pantalla completa amb mapa vectorial 3D (MapLibre + OpenFreeMap). */
 .navbtn { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 8px 14px; border: 0; border-radius: 999px; background: var(--accent); color: var(--surface); font: 600 15px/1.2 var(--f-body); cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
 .navbtn[hidden] { display: none; }
-/* La navegació sempre en fosc (proposta D), sigui quin sigui el tema de la pàgina. */
-#nav { --bg: #0f171d; --surface: #16212a; --fg: #e3ebf0; --muted: #91a2ae; --line: #2a3943; --field: #5f7380;
-  --accent: #6bb3e6; --rain: #4aa3ea; --snow: #b48cf0; --warn: #e8935f; --ok: #6cc28f; color-scheme: dark;
+/* Navegació: clara de dia i fosca només de nit (segons el sol on ets), sigui quin sigui el tema de la pàgina. */
+#nav { --bg: #f3f6f8; --surface: #ffffff; --fg: #16232d; --muted: #5b6b77; --line: #d6dee4; --field: #7d8b96;
+  --accent: #1f6fa8; --rain: #1f6fa8; --snow: #7a4fc0; --warn: #b5541c; --ok: #2d7a4b; color-scheme: light;
   position: fixed; inset: 0; z-index: 3000; background: var(--bg); color: var(--fg); }
+#nav.night { --bg: #0f171d; --surface: #16212a; --fg: #e3ebf0; --muted: #91a2ae; --line: #2a3943; --field: #5f7380;
+  --accent: #6bb3e6; --rain: #4aa3ea; --snow: #b48cf0; --warn: #e8935f; --ok: #6cc28f; color-scheme: dark; }
+#nav:not(.night) .nv-card, #nav:not(.night) .nv-alert, #nav:not(.night) .nv-pill, #nav:not(.night) .nv-btn:not(.exit) { box-shadow: 0 4px 16px rgba(0,0,0,.16); }
 #navmap { position: absolute; inset: 0; }
 .nv-top, .nv-bot { position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); z-index: 2; display: grid; gap: 8px; pointer-events: none; }
 .nv-top { top: max(12px, env(safe-area-inset-top, 0px)); }
@@ -248,6 +251,20 @@ header { display: grid; gap: 14px; }
 #nav .maplibregl-ctrl-attrib { font-size: .75rem; }
 #nav .maplibregl-ctrl-bottom-right, #nav .maplibregl-ctrl-bottom-left { bottom: calc(max(12px, env(safe-area-inset-bottom, 0px)) + 120px); }
 body.navving { overflow: hidden; }
+/* Mòbil en horitzontal: tot el panell en una columna a l'esquerra i el mapa a la dreta. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .nv-top, .nv-bot { right: auto; width: min(360px, 46vw); }
+  .nv-top { gap: 6px; } .nv-bot { gap: 6px; }
+  .nv-alert { padding: 8px 12px; gap: 2px 10px; }
+  .nv-alert .ic { min-width: 44px; } .nv-alert .ic .e { font-size: 1.75rem; } .nv-alert .ic b { font-size: 1rem; }
+  .nv-alert .tt { font-size: 1.125rem; } .nv-alert .sb { font-size: .8125rem; }
+  .nv-pill { min-height: 32px; padding: 4px 10px; font-size: .875rem; }
+  .nv-panel { padding: 8px 12px 10px; gap: 2px; }
+  .nv-clock { font-size: 1.75rem; }
+  .nv-track { height: 34px; }
+  .nv-bot .nv-row { position: fixed; right: max(12px, env(safe-area-inset-right, 0px)); bottom: max(12px, env(safe-area-inset-bottom, 0px)); }
+  #nav .maplibregl-ctrl-bottom-right, #nav .maplibregl-ctrl-bottom-left { bottom: max(4px, env(safe-area-inset-bottom, 0px)); }
+}
 @media (min-width: 900px) { .nv-top { left: auto; width: 420px; } .nv-top .nv-card { justify-self: stretch; } }
 /* Mides de toc, estats i moviment segons docs/guia-disseny.md (§3.1, §15.2, §14.9). */
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
@@ -1010,7 +1027,23 @@ body.navving { overflow: hidden; }
   // MapLibre GL (vendor/maplibre) amb l'estil vectorial gratuït d'OpenFreeMap (Positron, o Dark en tema fosc)
   // i edificis en relleu. La càmera segueix el GPS, inclinada i girada cap on vas. Es carrega només en entrar-hi.
   const NAV = { open: false, map: null, watch: null, sim: null, follow: true, lock: null, cd: null, ct: null, last: null, me: null, ends: [], prog: 0, offFar: false };
-  const isDark = () => true; // proposta D: la navegació va sempre amb el mapa fosc
+  // Fosc només de nit: el sol per sota de l'horitzó (−3°) on ets ara.
+  function sunAlt(lat, lon, t) {
+    const r = Math.PI / 180, d = t / 864e5 - 10957.5; // dies des de J2000
+    const g = (357.529 + 0.98560028 * d) * r, q = 280.459 + 0.98564736 * d;
+    const L = (q + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g)) * r, e = (23.439 - 0.00000036 * d) * r;
+    const ra = Math.atan2(Math.cos(e) * Math.sin(L), Math.cos(L)), dec = Math.asin(Math.sin(e) * Math.sin(L));
+    const H = ((18.697374558 + 24.06570982441908 * d) * 15 + lon) * r - ra;
+    return Math.asin(Math.sin(lat * r) * Math.sin(dec) + Math.cos(lat * r) * Math.cos(dec) * Math.cos(H)) / r;
+  }
+  const nightAt = (lon, lat) => sunAlt(lat, lon, Date.now()) < -3;
+  const isDark = () => !!NAV.night;
+  function setNight(on) {
+    on = !!on; $("nav").classList.toggle("night", on);
+    if (on === NAV.night) return;
+    NAV.night = on;
+    if (NAV.map) { NAV.map.getSource("rt") && ["done", "rt", "rt-edge", "rt-case", "b3d"].forEach(id => NAV.map.getLayer(id) && NAV.map.removeLayer(id)); NAV.map.setStyle(STYLE_URL(), { diff: false }); }
+  }
   const RMNAV = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
   let mlReady = null;
   function loadMapLibre() {
@@ -1148,11 +1181,16 @@ body.navving { overflow: hidden; }
     $("nvstats").innerHTML = left < 40 ? `Has arribat<b>${esc(B.name)}</b>` : `arribada<b>${fmtKm(left)} km · ${fmtDur(tLeft)}</b>`;
     if (offBy != null) navMsg(offBy > 80 ? `<span><b>Fora de la ruta</b>, a ${offBy < 1000 ? Math.round(offBy / 10) * 10 + " m" : fmtKm(offBy) + " km"}. Torna a la línia de color.</span>` : "", true);
   }
+  function navPad() { // on queda el cotxe a la pantalla: avall al centre, o a la dreta del panell en horitzontal
+    const c = NAV.map.getContainer(), W = c.clientWidth, H = c.clientHeight;
+    return W > H && H <= 560 ? { top: Math.round(H * .3), bottom: 0, left: Math.min(372, Math.round(W * .46) + 12), right: 0 } : { top: Math.round(H * .42), bottom: 0, left: 0, right: 0 };
+  }
   function setFollow(on) { NAV.follow = on; $("nvcenter").hidden = on; }
 
   // Cada posició (GPS o simulada): situa't a la ruta, gira la càmera cap on vas i actualitza el panell.
   function navUpdate(pos, quiet) {
     NAV.last = pos;
+    if (Date.now() - (NAV.nightChk || 0) > 120e3) { NAV.nightChk = Date.now(); setNight(nightAt(pos.lon, pos.lat)); }
     const p = [pos.lon, pos.lat], sn = snap(p), on = sn.dist < 60;
     if (on) NAV.prog = Math.max(sn.d, NAV.prog - 30); // no tornis enrere per soroll del GPS
     const here = on ? sn.pt : p;
@@ -1170,7 +1208,7 @@ body.navving { overflow: hidden; }
     }
     if (NAV.follow) {
       const v = pos.speed ?? 0, zoom = v > 22 ? 15.4 : v > 12 ? 16 : 16.8;
-      const cam = { center: here, bearing: brg, pitch: 60, zoom, padding: { top: Math.round(NAV.map.getContainer().clientHeight * .42), bottom: 0, left: 0, right: 0 } };
+      const cam = { center: here, bearing: brg, pitch: 60, zoom, padding: navPad() };
       if (RMNAV()) NAV.map.jumpTo(cam); else NAV.map.easeTo({ ...cam, duration: 950, easing: t => t, essential: false });
     }
   }
@@ -1208,6 +1246,7 @@ body.navving { overflow: hidden; }
     try { await loadMapLibre(); } catch { navMsg("No s'ha pogut carregar el mapa 3D. Revisa la connexió i torna-ho a provar.", true); return; }
     if (!NAV.open) return;
     const start = lastRoute.coords[0];
+    NAV.night = null; setNight(nightAt(start[0], start[1])); NAV.nightChk = Date.now();
     const m = NAV.map = new maplibregl.Map({ container: "navmap", style: STYLE_URL(), center: start, zoom: 16, pitch: 60, bearing: bearing(start, pointAt(60)), maxPitch: 70,
       attributionControl: { compact: true }, fadeDuration: RMNAV() ? 0 : 300 });
     let loaded = false;
@@ -1221,7 +1260,7 @@ body.navving { overflow: hidden; }
     // Si mous el mapa amb el dit, deixa de seguir-te fins que toquis Recentra.
     for (const ev of ["dragstart", "zoomstart", "rotatestart", "pitchstart"]) m.on(ev, (e) => { if (e.originalEvent) setFollow(false); });
     const meEl = document.createElement("div"); meEl.className = "nv-me"; meEl.setAttribute("role", "img"); meEl.setAttribute("aria-label", "La teva posició");
-    meEl.innerHTML = `<svg viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19" fill="${isDark() ? "#16212a" : "#fff"}"/><circle cx="22" cy="22" r="15" fill="#1f6fa8"/><path d="M22 10 L30 31 L22 26.5 L14 31 Z" fill="#fff"/></svg>`;
+    meEl.innerHTML = `<svg viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19" style="fill:var(--surface)"/><circle cx="22" cy="22" r="15" fill="#1f6fa8"/><path d="M22 10 L30 31 L22 26.5 L14 31 Z" fill="#fff"/></svg>`;
     NAV.me = new maplibregl.Marker({ element: meEl, rotationAlignment: "map", pitchAlignment: "map" }).setLngLat(start).addTo(m);
     const end = (c, lab) => { const el = document.createElement("div"); el.className = "nv-end"; el.style.background = c; el.setAttribute("role", "img"); el.setAttribute("aria-label", lab); return el; };
     NAV.ends = [new maplibregl.Marker({ element: end("#2d7a4b", "Sortida") }).setLngLat(start).addTo(m), new maplibregl.Marker({ element: end("#c0392b", "Destinació") }).setLngLat(lastRoute.coords.at(-1)).addTo(m)];
