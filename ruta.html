@@ -194,6 +194,42 @@ header { display: grid; gap: 14px; }
 .notes[open] summary::after { content: "▴"; }
 .notes summary::-webkit-details-marker { display: none; }
 .notes summary { list-style: none; }
+/* Navegació en directe (§19.2): capa a pantalla completa amb mapa vectorial 3D (MapLibre + OpenFreeMap). */
+.navbtn { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 8px 14px; border: 0; border-radius: 999px; background: var(--accent); color: var(--surface); font: 600 15px/1.2 var(--f-body); cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+.navbtn[hidden] { display: none; }
+#nav { position: fixed; inset: 0; z-index: 3000; background: var(--bg); color: var(--fg); }
+#navmap { position: absolute; inset: 0; }
+.nv-top, .nv-bot { position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); z-index: 2; display: grid; gap: 8px; pointer-events: none; }
+.nv-top { top: max(12px, env(safe-area-inset-top, 0px)); }
+.nv-bot { bottom: max(12px, env(safe-area-inset-bottom, 0px)); }
+.nv-top > *, .nv-bot > * { pointer-events: auto; }
+.nv-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 4px 16px rgba(0,0,0,.18); padding: 10px 14px; max-width: 560px; width: 100%; justify-self: center; }
+.nv-now { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; }
+.nv-now .e { font-size: 2rem; line-height: 1; }
+.nv-now .n { font-family: var(--f-display); font-size: 1.35rem; font-weight: 700; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nv-now .n small { display: block; font-family: var(--f-body); font-weight: 400; font-size: .8125rem; color: var(--muted); white-space: normal; }
+.nv-now .t { font-family: var(--f-display); font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.nv-next { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; border-top: 1px solid var(--line); margin-top: 6px; padding-top: 6px; font-size: .9375rem; }
+.nv-next:empty { display: none; }
+.nv-next b { font-weight: 600; } .nv-next .r { color: var(--rain); font-weight: 600; } .nv-next .s { color: var(--snow); font-weight: 600; }
+.nv-msg { font-size: .9375rem; display: grid; gap: 8px; }
+.nv-msg:empty { display: none; }
+.nv-msg.warn { border-color: var(--warn); }
+.nv-msg .btn { justify-self: start; }
+.nv-row { display: flex; align-items: center; gap: 10px; max-width: 560px; width: 100%; justify-self: center; }
+.nv-stats { flex: 1; min-width: 0; padding: 8px 14px; display: grid; gap: 0; }
+.nv-stats b { font-family: var(--f-display); font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+.nv-stats span { font-size: .8125rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.nv-btn { min-width: 52px; min-height: 52px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: 600 15px/1 var(--f-body); box-shadow: 0 4px 16px rgba(0,0,0,.18); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 16px; }
+.nv-btn.exit { color: var(--warn); }
+.nv-btn[hidden] { display: none; }
+.nv-me { width: 44px; height: 44px; }
+.nv-me svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
+.nv-end { width: 18px; height: 18px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.45); }
+#nav .maplibregl-ctrl-attrib { font-size: .75rem; }
+#nav .maplibregl-ctrl-bottom-right, #nav .maplibregl-ctrl-bottom-left { bottom: calc(max(12px, env(safe-area-inset-bottom, 0px)) + 64px); }
+body.navving { overflow: hidden; }
+@media (min-width: 900px) { .nv-top { left: auto; width: 420px; } .nv-top .nv-card { justify-self: stretch; } }
 /* Mides de toc, estats i moviment segons docs/guia-disseny.md (§3.1, §15.2, §14.9). */
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .btn, select.btn, .search input, input[type=time] { min-height: 44px; }
@@ -262,12 +298,27 @@ header { display: grid; gap: 14px; }
       <li>La ruta és la més ràpida en cotxe segons <a href="https://project-osrm.org" target="_blank" rel="noopener">OSRM</a> amb dades d'OpenStreetMap. No té en compte el trànsit en temps real.</li>
       <li>Els municipis i comarques de Catalunya surten dels límits oficials (IGN, 2024). Fora de Catalunya, el nom del lloc el dona <a href="https://nominatim.openstreetmap.org" target="_blank" rel="noopener">Nominatim</a>.</li>
       <li>El temps de cada municipi és la previsió d'Open-Meteo per a l'hora aproximada en què hi passaràs, al punt de la carretera on el travesses. Si hi passes d'aquí menys de mitja hora, és el temps d'ara. L'hora de pas surt de la durada del trajecte sense trànsit.</li>
+      <li><b>Navega en 3D</b> segueix la teva ubicació en directe sobre un mapa vectorial amb edificis en relleu (<a href="https://maplibre.org" target="_blank" rel="noopener">MapLibre</a> i <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>). La ubicació no surt del teu mòbil. Si ets lluny de la ruta, la pots provar amb una simulació.</li>
       <li>Les rutes guardades es queden en aquest navegador. Cada cop que n'obres una, es torna a calcular per al proper cop que la facis a l'hora triada: avui si encara no l'has acabat, si no, demà.</li>
       <li>És una estimació de models, no d'estacions. Si plou a prop, mira el <a href="./">radar del comparador</a>.</li>
     </ul>
   </details>
 </main>
 
+<div id="nav" role="dialog" aria-modal="true" aria-label="Navegació de la ruta" hidden>
+  <div id="navmap"></div>
+  <div class="nv-top">
+    <div class="nv-card nv-now" id="nvnow" aria-live="polite"></div>
+    <div class="nv-card nv-msg" id="nvmsg" role="status"></div>
+  </div>
+  <div class="nv-bot">
+    <div class="nv-row">
+      <button class="nv-btn exit" id="nvexit" type="button"><span aria-hidden="true">✕</span> Surt</button>
+      <div class="nv-card nv-stats" id="nvstats"></div>
+      <button class="nv-btn" id="nvcenter" type="button" hidden><span aria-hidden="true">◎</span> Recentra</button>
+    </div>
+  </div>
+</div>
 <script src="vendor/leaflet/leaflet.js"></script>
 <script src="ui.js" defer></script>
 <script>
@@ -608,6 +659,7 @@ header { display: grid; gap: 14px; }
     $("go").disabled = true;
     $("summary").innerHTML = ""; $("list").innerHTML = ""; $("mode").innerHTML = ""; $("save").hidden = true;
     layer?.clearLayers(); selIdx = -1; muniLayer?.clearLayers();
+    showNavBtn(false);
     try {
       setStatus("Calculant la ruta…");
       const [r] = await Promise.all([route(A, B), munisReady]);
@@ -631,6 +683,7 @@ header { display: grid; gap: 14px; }
       if (my !== seq) return;
       segs.forEach((s, i) => { s.w = ws[i]; s.k = s.w ? kind(s.w) : ""; });
       draw(r);
+      showNavBtn(true);
       // Noms fora de Catalunya (lent: 1 consulta per segon)
       const outs = segs.filter(s => !s.cat);
       for (let i = 0; i < outs.length; i++) {
@@ -677,6 +730,7 @@ header { display: grid; gap: 14px; }
       });
     }
     renderSummary(r); renderList(); renderLegend();
+    navRefresh();
   }
 
   // Color de cada punt de la ruta: el del seu municipi, i a prop d'un canvi, barreja dels dos (degradat).
@@ -925,12 +979,230 @@ header { display: grid; gap: 14px; }
     store.set("bmc.routes", rs); renderSaved();
   });
   // Si la pàgina torna a primer pla al cap d'una estona (p. ex. l'endemà al matí), recalcula.
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && A && B && Date.now() - lastRun > 15 * 60e3) run(); });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && !NAV.open && A && B && Date.now() - lastRun > 15 * 60e3) run(); });
 
   $("showicons").checked = !!store.get("bmc.route.icons");
   $("showicons").addEventListener("change", e => { store.set("bmc.route.icons", e.target.checked); if (segs.length && lastRoute) draw(lastRoute); });
 
+  // ---------- Navegació en directe (mapa 3D) ----------
+  // MapLibre GL (vendor/maplibre) amb l'estil vectorial gratuït d'OpenFreeMap (Positron, o Dark en tema fosc)
+  // i edificis en relleu. La càmera segueix el GPS, inclinada i girada cap on vas. Es carrega només en entrar-hi.
+  const NAV = { open: false, map: null, watch: null, sim: null, follow: true, lock: null, cd: null, ct: null, last: null, me: null, ends: [], prog: 0, offFar: false };
+  const isDark = () => document.documentElement.dataset.theme === "dark" || (document.documentElement.dataset.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+  const RMNAV = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let mlReady = null;
+  function loadMapLibre() {
+    if (window.maplibregl) return Promise.resolve();
+    return mlReady ??= new Promise((ok, ko) => {
+      const css = document.createElement("link"); css.rel = "stylesheet"; css.href = "vendor/maplibre/maplibre-gl.css"; document.head.append(css);
+      const sc = document.createElement("script"); sc.src = "vendor/maplibre/maplibre-gl.js"; sc.onload = ok; sc.onerror = () => { mlReady = null; ko(new Error("maplibre")); };
+      document.head.append(sc);
+    });
+  }
+  const STYLE_URL = () => `https://tiles.openfreemap.org/styles/${isDark() ? "dark" : "positron"}`;
+  // Reserva si OpenFreeMap no respon: imatges planes de CARTO (sense edificis 3D, però la navegació funciona).
+  const FALLBACK_STYLE = () => ({ version: 8, sources: { r: { type: "raster", tileSize: 256, maxzoom: 19, attribution: "© OpenStreetMap, © CARTO",
+    tiles: ["a", "b", "c"].map(x => `https://${x}.basemaps.cartocdn.com/${isDark() ? "dark_all" : "light_all"}/{z}/{x}/{y}@2x.png`) } }, layers: [{ id: "r", type: "raster", source: "r" }] });
+
+  // Geometria de la ruta en metres i segons acumulats, per saber on ets i quant et queda.
+  function navPrep() {
+    const c = lastRoute.coords, cd = [0], ct = [0];
+    for (let i = 1; i < c.length; i++) { cd.push(cd[i - 1] + hav(c[i - 1], c[i])); ct.push(ct[i - 1] + (lastRoute.durs?.[i - 1] ?? 0)); }
+    if (!lastRoute.durs) cd.forEach((d, i) => { ct[i] = lastRoute.duration * d / (cd.at(-1) || 1); });
+    NAV.cd = cd; NAV.ct = ct;
+  }
+  // Punt de la ruta més proper a [lon, lat]: distància al recorregut, metres fets i índex del tram.
+  function snap(p) {
+    const c = lastRoute.coords, kx = 111320 * Math.cos(p[1] * Math.PI / 180), ky = 110540;
+    let best = { dist: Infinity, d: 0, i: 0, pt: c[0] };
+    for (let i = 0; i < c.length - 1; i++) {
+      const ax = (c[i][0] - p[0]) * kx, ay = (c[i][1] - p[1]) * ky, bx = (c[i + 1][0] - p[0]) * kx, by = (c[i + 1][1] - p[1]) * ky;
+      const dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy;
+      const t = L2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / L2)) : 0;
+      const x = ax + dx * t, y = ay + dy * t, dist = Math.hypot(x, y);
+      if (dist < best.dist) best = { dist, i, t, d: NAV.cd[i] + (NAV.cd[i + 1] - NAV.cd[i]) * t, pt: [c[i][0] + (c[i + 1][0] - c[i][0]) * t, c[i][1] + (c[i + 1][1] - c[i][1]) * t] };
+    }
+    return best;
+  }
+  function pointAt(d) { // [lon, lat] a d metres de la sortida
+    const c = lastRoute.coords, cd = NAV.cd; let i = 0;
+    while (i < cd.length - 2 && cd[i + 1] < d) i++;
+    const f = Math.max(0, Math.min(1, (d - cd[i]) / ((cd[i + 1] - cd[i]) || 1)));
+    return [c[i][0] + (c[i + 1][0] - c[i][0]) * f, c[i][1] + (c[i + 1][1] - c[i][1]) * f];
+  }
+  function timeAt(d) { const cd = NAV.cd; let i = 0; while (i < cd.length - 2 && cd[i + 1] < d) i++; const f = Math.max(0, Math.min(1, (d - cd[i]) / ((cd[i + 1] - cd[i]) || 1))); return NAV.ct[i] + (NAV.ct[i + 1] - NAV.ct[i]) * f; }
+  function bearing(a, b) {
+    const r = Math.PI / 180, y = Math.sin((b[0] - a[0]) * r) * Math.cos(b[1] * r);
+    const x = Math.cos(a[1] * r) * Math.sin(b[1] * r) - Math.sin(a[1] * r) * Math.cos(b[1] * r) * Math.cos((b[0] - a[0]) * r);
+    return (Math.atan2(y, x) / r + 360) % 360;
+  }
+
+  // Línia de la ruta pintada pel temps de cada municipi; el tros ja fet queda en gris.
+  function navRouteData() {
+    return { type: "FeatureCollection", features: segs.map((s, i) => {
+      const pts = s.pts.map(p => [p.lon, p.lat]); if (segs[i + 1]) pts.push([segs[i + 1].pts[0].lon, segs[i + 1].pts[0].lat]);
+      return { type: "Feature", properties: { c: (CATS[s.cat] || CATS.none).c }, geometry: { type: "LineString", coordinates: pts } };
+    }).filter(f => f.geometry.coordinates.length > 1) };
+  }
+  function navDoneData() {
+    const c = lastRoute.coords, d = NAV.prog, out = [];
+    for (let i = 0; i < c.length && NAV.cd[i] < d; i++) out.push(c[i]);
+    out.push(pointAt(d));
+    return { type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: out.length > 1 ? out : [c[0], c[0]] } };
+  }
+  const W = (a, b) => ["interpolate", ["exponential", 1.5], ["zoom"], 8, a, 18, b];
+  function navLayers() {
+    const m = NAV.map; if (!m || !m.isStyleLoaded()) return;
+    const dark = isDark();
+    // Edificis en relleu, discrets, a sota de les etiquetes.
+    const vsrc = Object.entries(m.getStyle().sources).find(([, v]) => v.type === "vector")?.[0];
+    const firstSym = m.getStyle().layers.find(l => l.type === "symbol")?.id;
+    if (vsrc && !m.getLayer("b3d")) m.addLayer({ id: "b3d", type: "fill-extrusion", source: vsrc, "source-layer": "building", minzoom: 14,
+      paint: { "fill-extrusion-color": dark ? "#2a3742" : "#e4e8ec", "fill-extrusion-opacity": .9, "fill-extrusion-base": ["coalesce", ["get", "render_min_height"], 0],
+        "fill-extrusion-height": ["interpolate", ["linear"], ["zoom"], 14, 0, 15.5, ["coalesce", ["get", "render_height"], 6]] } }, firstSym);
+    if (!m.getSource("rt")) {
+      m.addSource("rt", { type: "geojson", data: navRouteData() });
+      m.addSource("done", { type: "geojson", data: navDoneData() });
+      m.addLayer({ id: "rt-case", type: "line", source: "rt", layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": dark ? "#0b1116" : "#ffffff", "line-width": W(7, 26) } });
+      m.addLayer({ id: "rt-edge", type: "line", source: "rt", layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": dark ? "#cfdbe3" : "#2b3f4e", "line-width": W(5.5, 21) } });
+      m.addLayer({ id: "rt", type: "line", source: "rt", layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": ["get", "c"], "line-width": W(4, 16) } });
+      m.addLayer({ id: "done", type: "line", source: "done", layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": dark ? "#5f7380" : "#a9b4bc", "line-width": W(5.5, 21) } });
+    }
+  }
+  function navRefresh() { // el temps o els noms han canviat mentre navegues
+    if (!NAV.open || !NAV.map?.getSource("rt")) return;
+    NAV.map.getSource("rt").setData(navRouteData());
+    if (NAV.last) navUpdate(NAV.last, true);
+  }
+
+  function navMsg(html, warn) { const el = $("nvmsg"); el.innerHTML = html || ""; el.classList.toggle("warn", !!warn); }
+  function segAt(d) { let k = 0; while (k < segs.length - 1 && segs[k + 1].from <= d) k++; return k; }
+  function navHud(d, offBy) {
+    const k = segAt(d), s = segs[k], left = Math.max(0, NAV.cd.at(-1) - d), tLeft = Math.max(0, NAV.ct.at(-1) - timeAt(d));
+    const [e, txt] = look(s), w = s.w;
+    const mm = w && s.k === "wet" ? ` · <span class=r>${fmt1(w.precipitation)} mm</span>` : w && s.k === "snow" ? " · <span class=s>neu</span>" : "";
+    const nx = segs.slice(k + 1).find(x => x.name && x.name !== s.name) || segs[k + 1];
+    let next = "";
+    if (nx) {
+      const [e2, t2] = look(nx), w2 = nx.w;
+      const changes = (nx.cat !== s.cat);
+      next = `<span role=img aria-label="${esc(t2)}">${e2}</span><span>${changes ? "Canvia: " : "Després: "}<b>${esc(nx.name || "…")}</b> d'aquí ${fmtKm(Math.max(0, nx.from - d))} km · ${w2 ? Math.round(w2.temperature_2m) + "°" : ""}${nx.k === "wet" ? ` <span class=r>${fmt1(w2.precipitation)} mm</span>` : nx.k === "snow" ? " <span class=s>neu</span>" : ""}</span>`;
+    }
+    $("nvnow").innerHTML = `<span class=e role=img aria-label="${esc(txt)}">${e}</span><span class=n>${esc(s.name || "…")}<small>${esc(txt)}${mm}${s.comarca ? " · " + esc(s.comarca) : ""}</small></span><span class=t>${w ? Math.round(w.temperature_2m) + "°" : ""}</span><div class=nv-next>${next}</div>`;
+    $("nvstats").innerHTML = left < 40 ? `<b>Has arribat</b><span>${esc(B.name)}</span>`
+      : `<b>${fmtKm(left)} km · ${fmtDur(tLeft)}</b><span>Arribada cap a les ${fmtClock(Date.now() + tLeft * 1000)}</span>`;
+    if (offBy != null) navMsg(offBy > 80 ? `<span><b>Fora de la ruta</b>, a ${offBy < 1000 ? Math.round(offBy / 10) * 10 + " m" : fmtKm(offBy) + " km"}. Torna a la línia de color.</span>` : "", true);
+  }
+  function setFollow(on) { NAV.follow = on; $("nvcenter").hidden = on; }
+
+  // Cada posició (GPS o simulada): situa't a la ruta, gira la càmera cap on vas i actualitza el panell.
+  function navUpdate(pos, quiet) {
+    NAV.last = pos;
+    const p = [pos.lon, pos.lat], sn = snap(p), on = sn.dist < 60;
+    if (on) NAV.prog = Math.max(sn.d, NAV.prog - 30); // no tornis enrere per soroll del GPS
+    const here = on ? sn.pt : p;
+    // Direcció: la de la carretera una mica més endavant (estable); fora de ruta, la del GPS.
+    let brg = NAV.brg ?? bearing(lastRoute.coords[0], pointAt(60));
+    if (on) brg = bearing(sn.pt, pointAt(sn.d + 50));
+    else if (pos.heading != null && !isNaN(pos.heading) && (pos.speed ?? 0) > 1.5) brg = pos.heading;
+    NAV.brg = brg;
+    NAV.me.setLngLat(here).setRotation(brg);
+    NAV.map.getSource("done")?.setData(navDoneData());
+    navHud(on ? NAV.prog : sn.d, quiet ? null : sn.dist);
+    if (!quiet && sn.dist > 3000 && !NAV.sim && !NAV.offFar) {
+      NAV.offFar = true;
+      navMsg(`<span>Ets a ${fmtKm(sn.dist)} km de la ruta. Quan hi siguis, la seguiré. Mentrestant pots veure com funciona amb una simulació.</span><button class=btn type=button id=nvsim>▶ Simula el trajecte</button>`, true);
+    }
+    if (NAV.follow) {
+      const v = pos.speed ?? 0, zoom = v > 22 ? 15.4 : v > 12 ? 16 : 16.8;
+      const cam = { center: here, bearing: brg, pitch: 60, zoom, padding: { top: Math.round(NAV.map.getContainer().clientHeight * .42), bottom: 0, left: 0, right: 0 } };
+      if (RMNAV()) NAV.map.jumpTo(cam); else NAV.map.easeTo({ ...cam, duration: 950, easing: t => t, essential: false });
+    }
+  }
+  function navGps() {
+    if (!("geolocation" in navigator)) { navMsg(`<span>Aquest navegador no dona la ubicació.</span><button class=btn type=button id=nvsim>▶ Simula el trajecte</button>`, true); return; }
+    navMsg("Buscant la teva ubicació…");
+    NAV.watch = navigator.geolocation.watchPosition(
+      (p) => { if (NAV.sim) return; if (!NAV.offFar) navMsg(""); navUpdate({ lon: p.coords.longitude, lat: p.coords.latitude, heading: p.coords.heading, speed: p.coords.speed }); },
+      (e) => { if (NAV.sim) return; navMsg(`<span>${e.code === 1 ? "No tinc permís per veure la teva ubicació. Activa-la per a aquesta web per seguir la ruta." : "No trobo la teva ubicació."}</span><button class=btn type=button id=nvsim>▶ Simula el trajecte</button>`, true); },
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
+  }
+  // Simulació: recorre la ruta a 6× la velocitat prevista, per provar-ho des de casa.
+  function navSim() {
+    NAV.offFar = true; NAV.prog = 0; setFollow(true); navMsg("Simulació del trajecte (6× més ràpid). Toca Surt per acabar.");
+    let d = 0; const total = NAV.cd.at(-1), t0 = Date.now();
+    clearInterval(NAV.sim);
+    NAV.sim = setInterval(() => {
+      const dt = timeAt(Math.min(total, d + 200)) - timeAt(d); // velocitat prevista en aquest tros (m/s)
+      const v = Math.max(8, Math.min(40, dt > 0 ? (Math.min(total, d + 200) - d) / dt : 20));
+      d = Math.min(total, d + v * 6);
+      const p = pointAt(d); navUpdate({ lon: p[0], lat: p[1], speed: v });
+      if (d >= total || Date.now() - t0 > 3 * 3600e3) { clearInterval(NAV.sim); NAV.sim = "done"; }
+    }, 1000);
+  }
+  async function wakeLock() { try { if (NAV.open && "wakeLock" in navigator && document.visibilityState === "visible") NAV.lock = await navigator.wakeLock.request("screen"); } catch {} }
+
+  async function navOpen() {
+    if (NAV.open || !lastRoute) return;
+    NAV.open = true; NAV.ret = document.activeElement; NAV.follow = true; NAV.prog = 0; NAV.offFar = false; NAV.last = null; NAV.brg = null;
+    $("nav").hidden = false; document.querySelector("main").inert = true; document.body.classList.add("navving");
+    history.pushState({ nav: 1 }, ""); $("nvexit").focus();
+    navPrep(); setFollow(true); navMsg("Carregant el mapa 3D…");
+    $("nvnow").innerHTML = ""; $("nvstats").innerHTML = "";
+    try { await loadMapLibre(); } catch { navMsg("No s'ha pogut carregar el mapa 3D. Revisa la connexió i torna-ho a provar.", true); return; }
+    if (!NAV.open) return;
+    const start = lastRoute.coords[0];
+    const m = NAV.map = new maplibregl.Map({ container: "navmap", style: STYLE_URL(), center: start, zoom: 16, pitch: 60, bearing: bearing(start, pointAt(60)), maxPitch: 70,
+      attributionControl: { compact: true }, fadeDuration: RMNAV() ? 0 : 300 });
+    let loaded = false;
+    const fb = setTimeout(() => { if (!loaded) m.setStyle(FALLBACK_STYLE()); }, 9000);
+    m.on("error", (e) => { if (!loaded && /style|openfreemap/i.test(String(e?.error?.message || e?.error?.url || ""))) { clearTimeout(fb); loaded = true; m.setStyle(FALLBACK_STYLE()); } });
+    m.on("style.load", () => { loaded = true; clearTimeout(fb); navLayers(); });
+    m.on("load", () => { loaded = true; clearTimeout(fb); });
+    // Si mous el mapa amb el dit, deixa de seguir-te fins que toquis Recentra.
+    for (const ev of ["dragstart", "zoomstart", "rotatestart", "pitchstart"]) m.on(ev, (e) => { if (e.originalEvent) setFollow(false); });
+    const meEl = document.createElement("div"); meEl.className = "nv-me"; meEl.setAttribute("role", "img"); meEl.setAttribute("aria-label", "La teva posició");
+    meEl.innerHTML = `<svg viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19" fill="${isDark() ? "#16212a" : "#fff"}"/><circle cx="22" cy="22" r="15" fill="#1f6fa8"/><path d="M22 10 L30 31 L22 26.5 L14 31 Z" fill="#fff"/></svg>`;
+    NAV.me = new maplibregl.Marker({ element: meEl, rotationAlignment: "map", pitchAlignment: "map" }).setLngLat(start).addTo(m);
+    const end = (c, lab) => { const el = document.createElement("div"); el.className = "nv-end"; el.style.background = c; el.setAttribute("role", "img"); el.setAttribute("aria-label", lab); return el; };
+    NAV.ends = [new maplibregl.Marker({ element: end("#2d7a4b", "Sortida") }).setLngLat(start).addTo(m), new maplibregl.Marker({ element: end("#c0392b", "Destinació") }).setLngLat(lastRoute.coords.at(-1)).addTo(m)];
+    navHud(0, null);
+    wakeLock();
+    navGps();
+  }
+  function navClose(fromPop) {
+    if (!NAV.open) return;
+    if (!fromPop && history.state?.nav) { history.back(); return; } // el popstate ho tanca
+    NAV.open = false;
+    if (NAV.watch != null) navigator.geolocation.clearWatch(NAV.watch); NAV.watch = null;
+    if (NAV.sim && NAV.sim !== "done") clearInterval(NAV.sim); NAV.sim = null;
+    try { NAV.lock?.release(); } catch {} NAV.lock = null;
+    NAV.map?.remove(); NAV.map = null;
+    $("nav").hidden = true; document.querySelector("main").inert = false; document.body.classList.remove("navving");
+    (NAV.ret && document.contains(NAV.ret) ? NAV.ret : navBtn)?.focus();
+  }
+  addEventListener("popstate", () => navClose(true));
+  $("nvexit").addEventListener("click", () => navClose());
+  $("nvcenter").addEventListener("click", () => { setFollow(true); if (NAV.last) navUpdate(NAV.last, true); });
+  $("nvmsg").addEventListener("click", (e) => { if (e.target.closest("#nvsim")) navSim(); });
+  document.addEventListener("keydown", (e) => { if (NAV.open && e.key === "Escape") { e.preventDefault(); navClose(); } });
+  document.addEventListener("visibilitychange", () => { if (NAV.open && document.visibilityState === "visible") wakeLock(); });
+  // Botó a sobre del mapa de Leaflet: només apareix quan hi ha una ruta dibuixada.
+  let navBtn = null;
+  function addNavControl() {
+    if (!map) return;
+    const C = L.Control.extend({ onAdd() {
+      const b = L.DomUtil.create("button", "navbtn"); b.type = "button"; b.hidden = true;
+      b.innerHTML = `<span aria-hidden="true">🧭</span> Navega en 3D`; b.title = "Segueix la ruta en directe amb un mapa 3D";
+      L.DomEvent.disableClickPropagation(b); b.addEventListener("click", navOpen);
+      return (navBtn = b);
+    } });
+    new C({ position: "topright" }).addTo(map);
+  }
+  const showNavBtn = (on) => { if (navBtn) navBtn.hidden = !on; };
+
   initMap();
+  addNavControl();
   syncInputs();
   syncWhen();
   renderSaved();
